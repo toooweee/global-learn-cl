@@ -8,10 +8,544 @@ datasource db {
   provider = "postgresql"
 }
 
+// ============================================================
+// Identity
+// ============================================================
+
 model User {
-  id             String @id @default(uuid())
-  email          String @unique
-  hashedPassword String @map("hashed_password")
+  id             String    @id @default(uuid()) @db.Uuid
+  email          String    @unique @db.VarChar(255)
+  hashedPassword String    @map("hashed_password") @db.VarChar(255)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  employee      Employee?
+  client        Client?
+  roles         UserRole[]
+  notifications Notification[]
 
   @@map("users")
+}
+
+model Role {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique @db.VarChar(64)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  users UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ============================================================
+// Organization
+// ============================================================
+
+model Department {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique @db.VarChar(255)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  divisions Division[]
+
+  @@map("departments")
+}
+
+model Division {
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String    @unique @db.VarChar(255)
+  departmentId String    @map("department_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  department          Department           @relation(fields: [departmentId], references: [id])
+  employees           Employee[]
+  onboardingTemplates OnboardingTemplate[]
+
+  @@map("divisions")
+}
+
+model Position {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique @db.VarChar(255)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  employees           Employee[]
+  onboardingTemplates OnboardingTemplate[]
+
+  @@map("positions")
+}
+
+model Employee {
+  id             String    @id @db.Uuid
+  fullname       String    @db.VarChar(255)
+  biography      String?   @db.Text
+  employmentDate DateTime  @map("employment_date") @db.Timestamptz
+  dismissalDate  DateTime? @map("dismissal_date") @db.Timestamptz
+  divisionId     String    @map("division_id") @db.Uuid
+  positionId     String?   @map("position_id") @db.Uuid
+  avatarId       String?   @map("avatar_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  user     User      @relation(fields: [id], references: [id], onDelete: Cascade)
+  division Division  @relation(fields: [divisionId], references: [id])
+  position Position? @relation(fields: [positionId], references: [id])
+  avatar   File?     @relation("EmployeeAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
+
+  authoredCourses     Course[]                @relation("CourseAuthor")
+  enrollments         CourseEnrollment[]
+  testAttempts        TestAttempt[]
+  onboardingsAssigned Onboarding[]            @relation("OnboardingAssignedBy")
+  onboardingsReceived Onboarding[]            @relation("OnboardingAssignedTo")
+  chatMessagesSent    OnboardingChatMessage[] @relation("OnboardingChatMessageSender")
+
+  @@map("employees")
+}
+
+model ClientCompany {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.VarChar(255)
+  avatarId  String?   @map("avatar_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  avatar  File?    @relation("ClientCompanyAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
+  clients Client[]
+
+  @@map("client_companies")
+}
+
+model Client {
+  id        String    @id @db.Uuid
+  fullname  String    @db.VarChar(255)
+  avatarId  String?   @map("avatar_id") @db.Uuid
+  companyId String    @map("company_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  user    User          @relation(fields: [id], references: [id], onDelete: Cascade)
+  avatar  File?         @relation("ClientAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
+  company ClientCompany @relation(fields: [companyId], references: [id])
+
+  @@map("clients")
+}
+
+// ============================================================
+// Files
+// ============================================================
+
+model File {
+  id  String @id @default(uuid()) @db.Uuid
+  url String @db.VarChar(255)
+
+  courses                 Course[]                 @relation("CourseCover")
+  employeeAvatars         Employee[]               @relation("EmployeeAvatar")
+  clientAvatars           Client[]                 @relation("ClientAvatar")
+  clientCompanyAvatars    ClientCompany[]          @relation("ClientCompanyAvatar")
+  onboardingTemplates     OnboardingTemplate[]     @relation("OnboardingTemplateCover")
+  onboardingTemplateSteps OnboardingTemplateStep[] @relation("OnboardingTemplateStepCover")
+
+  @@map("files")
+}
+
+// ============================================================
+// Education
+// ============================================================
+
+model Course {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(255)
+  description String    @db.Text
+  authorId    String    @map("author_id") @db.Uuid
+  coverId     String?   @map("cover_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  author                  Employee                 @relation("CourseAuthor", fields: [authorId], references: [id])
+  cover                   File?                    @relation("CourseCover", fields: [coverId], references: [id], onDelete: SetNull)
+  modules                 Module[]
+  questions               CourseQuestion[]
+  enrollments             CourseEnrollment[]
+  onboardingTemplateSteps OnboardingTemplateStep[]
+  onboardingSteps         OnboardingStep[]
+
+  @@map("courses")
+}
+
+model Module {
+  id       String @id @default(uuid()) @db.Uuid
+  courseId String @map("course_id") @db.Uuid
+  position Int
+  name     String @db.VarChar(255)
+
+  course    Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  steps     Step[]
+  questions CourseQuestion[]
+
+  @@unique([courseId, position])
+  @@map("modules")
+}
+
+enum StepType {
+  LESSON
+  TEST
+
+  @@map("step_type")
+}
+
+model Step {
+  id       String   @id @default(uuid()) @db.Uuid
+  moduleId String   @map("module_id") @db.Uuid
+  position Int
+  name     String   @db.VarChar(255)
+  type     StepType
+  lessonId String?  @map("lesson_id") @db.Uuid
+  testId   String?  @map("test_id") @db.Uuid
+
+  module   Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  lesson   Lesson?        @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  test     Test?          @relation(fields: [testId], references: [id], onDelete: SetNull)
+  progress StepProgress[]
+
+  @@unique([moduleId, position])
+  @@map("steps")
+}
+
+model Lesson {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.Text
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  steps Step[]
+
+  @@map("lessons")
+}
+
+model Test {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.Text
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  questions TestQuestion[]
+  attempts  TestAttempt[]
+  steps     Step[]
+
+  @@map("tests")
+}
+
+model CourseQuestion {
+  id       String  @id @default(uuid()) @db.Uuid
+  question String  @db.VarChar(255)
+  courseId String  @map("course_id") @db.Uuid
+  moduleId String? @map("module_id") @db.Uuid
+
+  course             Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module             Module?             @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  answers            CourseAnswer[]
+  testQuestions      TestQuestion[]
+  testAttemptAnswers TestAttemptAnswer[]
+
+  @@map("course_questions")
+}
+
+model CourseAnswer {
+  id         String  @id @default(uuid()) @db.Uuid
+  answer     String  @db.VarChar(255)
+  isCorrect  Boolean @default(false) @map("is_correct")
+  questionId String  @map("question_id") @db.Uuid
+
+  question           CourseQuestion      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  testAttemptAnswers TestAttemptAnswer[]
+
+  @@map("course_answers")
+}
+
+model TestQuestion {
+  id         String @id @default(uuid()) @db.Uuid
+  testId     String @map("test_id") @db.Uuid
+  questionId String @map("question_id") @db.Uuid
+
+  test     Test           @relation(fields: [testId], references: [id], onDelete: Cascade)
+  question CourseQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, questionId])
+  @@map("test_questions")
+}
+
+model TestAttempt {
+  id         String    @id @default(uuid()) @db.Uuid
+  testId     String    @map("test_id") @db.Uuid
+  employeeId String    @map("employee_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  endedAt    DateTime? @map("ended_at") @db.Timestamptz
+
+  test     Test                @relation(fields: [testId], references: [id], onDelete: Cascade)
+  employee Employee            @relation(fields: [employeeId], references: [id])
+  answers  TestAttemptAnswer[]
+
+  @@index([employeeId, testId])
+  @@map("test_attempts")
+}
+
+model TestAttemptAnswer {
+  id         String   @id @default(uuid()) @db.Uuid
+  option     String   @db.VarChar(255)
+  attemptId  String   @map("attempt_id") @db.Uuid
+  questionId String   @map("question_id") @db.Uuid
+  answerId   String   @map("answer_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  attempt  TestAttempt    @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question CourseQuestion @relation(fields: [questionId], references: [id])
+  answer   CourseAnswer   @relation(fields: [answerId], references: [id])
+
+  @@map("test_attempt_answers")
+}
+
+// ============================================================
+// Progress tracking
+// ============================================================
+
+enum EnrollmentStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+
+  @@map("enrollment_status")
+}
+
+model CourseEnrollment {
+  id          String           @id @default(uuid()) @db.Uuid
+  courseId    String           @map("course_id") @db.Uuid
+  employeeId  String           @map("employee_id") @db.Uuid
+  status      EnrollmentStatus @default(IN_PROGRESS)
+  startedAt   DateTime         @default(now()) @map("started_at") @db.Timestamptz
+  completedAt DateTime?        @map("completed_at") @db.Timestamptz
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime?        @updatedAt @map("updated_at") @db.Timestamptz
+
+  course   Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  progress StepProgress[]
+
+  @@unique([courseId, employeeId])
+  @@map("course_enrollments")
+}
+
+model StepProgress {
+  id           String    @id @default(uuid()) @db.Uuid
+  stepId       String    @map("step_id") @db.Uuid
+  enrollmentId String    @map("enrollment_id") @db.Uuid
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  step       Step             @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  enrollment CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([stepId, enrollmentId])
+  @@map("step_progress")
+}
+
+// ============================================================
+// Onboarding
+// ============================================================
+
+enum OnboardingStepType {
+  TEXT
+  COURSE
+
+  @@map("onboarding_step_type")
+}
+
+enum OnboardingStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+
+  @@map("onboarding_status")
+}
+
+model OnboardingTemplate {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(255)
+  description String    @db.Text
+  positionId  String    @map("position_id") @db.Uuid
+  divisionId  String    @map("division_id") @db.Uuid
+  coverId     String?   @map("cover_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  position    Position                 @relation(fields: [positionId], references: [id])
+  division    Division                 @relation(fields: [divisionId], references: [id])
+  cover       File?                    @relation("OnboardingTemplateCover", fields: [coverId], references: [id], onDelete: SetNull)
+  steps       OnboardingTemplateStep[]
+  onboardings Onboarding[]
+
+  @@unique([positionId, divisionId])
+  @@map("onboarding_templates")
+}
+
+model OnboardingTemplateStep {
+  id                         String             @id @default(uuid()) @db.Uuid
+  templateId                 String             @map("template_id") @db.Uuid
+  position                   Int
+  name                       String             @db.VarChar(255)
+  description                String             @db.Text
+  type                       OnboardingStepType
+  courseId                   String?            @map("course_id") @db.Uuid
+  recommendedStartOffsetDays Int                @map("recommended_start_offset_days")
+  recommendedEndOffsetDays   Int                @map("recommended_end_offset_days")
+  coverId                    String?            @map("cover_id") @db.Uuid
+  createdAt                  DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                  DateTime?          @updatedAt @map("updated_at") @db.Timestamptz
+
+  template        OnboardingTemplate                     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  course          Course?                                @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  cover           File?                                  @relation("OnboardingTemplateStepCover", fields: [coverId], references: [id], onDelete: SetNull)
+  feedbackOptions OnboardingTemplateStepFeedbackOption[]
+
+  @@unique([templateId, position])
+  @@map("onboarding_template_steps")
+}
+
+model OnboardingTemplateStepFeedbackOption {
+  id     String @id @default(uuid()) @db.Uuid
+  stepId String @map("step_id") @db.Uuid
+  label  String @db.VarChar(255)
+
+  step OnboardingTemplateStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_template_step_feedback_options")
+}
+
+model Onboarding {
+  id           String           @id @default(uuid()) @db.Uuid
+  name         String           @db.VarChar(255)
+  description  String           @db.Text
+  templateId   String?          @map("template_id") @db.Uuid
+  assignedById String           @map("assigned_by") @db.Uuid
+  assignedToId String           @map("assigned_to") @db.Uuid
+  status       OnboardingStatus @default(IN_PROGRESS)
+  startDate    DateTime         @map("start_date") @db.Timestamptz
+  endDate      DateTime         @map("end_date") @db.Timestamptz
+  completedAt  DateTime?        @map("completed_at") @db.Timestamptz
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime?        @updatedAt @map("updated_at") @db.Timestamptz
+
+  template   OnboardingTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  assignedBy Employee            @relation("OnboardingAssignedBy", fields: [assignedById], references: [id])
+  assignedTo Employee            @relation("OnboardingAssignedTo", fields: [assignedToId], references: [id])
+  steps      OnboardingStep[]
+  chat       OnboardingChat?
+
+  @@index([assignedToId, status])
+  @@map("onboardings")
+}
+
+model OnboardingStep {
+  id                   String             @id @default(uuid()) @db.Uuid
+  onboardingId         String             @map("onboarding_id") @db.Uuid
+  position             Int
+  name                 String             @db.VarChar(255)
+  description          String             @db.Text
+  type                 OnboardingStepType
+  courseId             String?            @map("course_id") @db.Uuid
+  recommendedStartDate DateTime           @map("recommended_start_date") @db.Timestamptz
+  recommendedEndDate   DateTime           @map("recommended_end_date") @db.Timestamptz
+  feedbackText         String?            @map("feedback_text") @db.Text
+  completedAt          DateTime?          @map("completed_at") @db.Timestamptz
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime?          @updatedAt @map("updated_at") @db.Timestamptz
+
+  onboarding         Onboarding                        @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  course             Course?                           @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  feedbackOptions    OnboardingStepFeedbackOption[]
+  feedbackSelections OnboardingStepFeedbackSelection[]
+
+  @@unique([onboardingId, position])
+  @@map("onboarding_steps")
+}
+
+model OnboardingStepFeedbackOption {
+  id     String @id @default(uuid()) @db.Uuid
+  stepId String @map("step_id") @db.Uuid
+  label  String @db.VarChar(255)
+
+  step       OnboardingStep                    @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  selections OnboardingStepFeedbackSelection[]
+
+  @@map("onboarding_step_feedback_options")
+}
+
+model OnboardingStepFeedbackSelection {
+  stepId   String @map("step_id") @db.Uuid
+  optionId String @map("option_id") @db.Uuid
+
+  step   OnboardingStep               @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  option OnboardingStepFeedbackOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@id([stepId, optionId])
+  @@map("onboarding_step_feedback_selections")
+}
+
+model OnboardingChat {
+  id           String   @id @default(uuid()) @db.Uuid
+  onboardingId String   @unique @map("onboarding_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  onboarding Onboarding              @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  messages   OnboardingChatMessage[]
+
+  @@map("onboarding_chats")
+}
+
+model OnboardingChatMessage {
+  id        String    @id @default(uuid()) @db.Uuid
+  chatId    String    @map("chat_id") @db.Uuid
+  senderId  String    @map("sender_id") @db.Uuid
+  body      String    @db.Text
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  chat   OnboardingChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender Employee       @relation("OnboardingChatMessageSender", fields: [senderId], references: [id])
+
+  @@index([chatId, createdAt])
+  @@map("onboarding_chat_messages")
+}
+
+// ============================================================
+// Notifications
+// ============================================================
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String    @db.VarChar(64)
+  payload   Json?     @db.JsonB
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
 }
