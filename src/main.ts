@@ -1,9 +1,21 @@
-import { NestFactory } from '@nestjs/core';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from '@/modules/app/app.module';
 import { EnvService } from '@/infra/env/env.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: false },
+    }),
+  );
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+
   const envService = app.get(EnvService);
   await app.listen(envService.get('PORT'), '0.0.0.0');
 }

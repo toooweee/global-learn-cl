@@ -10,7 +10,7 @@ docker-up:
 
 wait-db:
 	@echo "Waiting for database..."
-	@until docker exec -it global-learn-api-postgres-1 pg_isready -U postgres; do \
+	@until docker exec -it global-learn-cl-postgres-1 pg_isready -U postgres; do \
   		sleep 2; \
   	done
 

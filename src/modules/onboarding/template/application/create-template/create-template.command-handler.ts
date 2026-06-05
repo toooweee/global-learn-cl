@@ -1,11 +1,16 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import { ConflictException, Inject } from '@nestjs/common';
+import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { OnboardingTemplateEntity } from '@/modules/onboarding/template/domain/template.entity';
 import { CreateOnboardingTemplateCommand } from '@/modules/onboarding/template/application/create-template/create-template.command';
 import { ONBOARDING_TEMPLATE_REPOSITORY } from '@/modules/onboarding/template/application/ports/template.repository.port';
 import type { OnboardingTemplateRepositoryPort } from '@/modules/onboarding/template/application/ports/template.repository.port';
+import { IdResponseDto } from '@/libs/api/dto';
 
-@Injectable()
-export class CreateOnboardingTemplateHandler {
+@CommandHandler(CreateOnboardingTemplateCommand)
+export class CreateOnboardingTemplateHandler implements ICommandHandler<
+  CreateOnboardingTemplateCommand,
+  IdResponseDto
+> {
   constructor(
     @Inject(ONBOARDING_TEMPLATE_REPOSITORY)
     private readonly repository: OnboardingTemplateRepositoryPort,
@@ -13,7 +18,7 @@ export class CreateOnboardingTemplateHandler {
 
   async execute(
     command: CreateOnboardingTemplateCommand,
-  ): Promise<{ id: string }> {
+  ): Promise<IdResponseDto> {
     return this.repository.transaction(async () => {
       const existing = await this.repository.findForRole(
         command.positionId,
@@ -36,7 +41,7 @@ export class CreateOnboardingTemplateHandler {
 
       await this.repository.save(template);
 
-      return { id: template.id };
+      return new IdResponseDto(template.id);
     });
   }
 }

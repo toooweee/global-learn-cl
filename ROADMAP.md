@@ -6,8 +6,8 @@
 Состояние на момент написания:
 - БД полностью описана (см. `prisma/schema.prisma` + `CLAUDE.md` → «Database schema»).
 - Wired-up модули: `EnvModule`, `PrismaModule`, `RequestContextModule`, `UserModule` (пустой), `OnboardingModule` (полный — template / assignment / chat).
-- Куча скелетов под use cases в `src/modules/{employee,education/*,identity/auth}` — папки и пустые `.ts` файлы. Не выкидывать без причины: они отражают замысел.
-- В `dependencies` есть `@nestjs/cqrs`, но проект пока использует «ручной» CQRS (handler-классы дёргаются напрямую из контроллеров через DI). Решение: либо везде уйти на `CommandBus`, либо вычистить `@nestjs/cqrs`. **Текущая конвенция — ручная**, см. `src/modules/onboarding/**/application/**.command-handler.ts`. Не менять без обсуждения.
+- Куча скелетов под use cases в `src/modules/{employee,education/*,identity/auth}` — папки и пустые `.ts` файлы. Не выкидывать без причины: они отражают замысел. Все они должны переехать на `@nestjs/cqrs` `CommandBus` (см. эталон в `src/modules/onboarding/**/application/**.command-handler.ts`).
+- Валидация HTTP-запросов: **`class-validator` + `class-transformer`** (DTO в `presentation/dto/`). Ответы — классы из `src/libs/application/` (`IdResponseDto` / `BaseResponseDto` / `PaginatedResponseDto<T>`) с `@Exclude` на классе и `@Expose` на полях. `zod` оставлен только для `EnvSchema`.
 - Redis объявлен в `.env` / `EnvSchema`, но не используется. MailHog поднят, но мейлера нет.
 
 > Перед каждой большой фазой проверять: `pnpm lint && pnpm build && pnpm test`. Прогон `pnpm prisma generate` нужен после любых изменений `schema.prisma`. Node берём из `.nvmrc` (24.15.0) — Node 18 ломает Prisma 7 CLI (см. ошибку `ERR_REQUIRE_ESM` в zeptomatch).
@@ -18,7 +18,7 @@
 
 Эти штуки тривиальны, но без них последующие фазы будут писаться криво.
 
-- [ ] **Global exception filter**: `src/libs/exceptions/domain-exception.filter.ts` — маппит ошибки из домена (например `new Error('Cannot complete a step out of order')`) в `HttpException`. Сейчас домен бросает голые `Error`, контроллер отдаст 500. Завести базовые типы доменных ошибок: `DomainError`, `ConflictError`, `NotFoundError`, `ForbiddenError`. Зарегистрировать `APP_FILTER` в `AppModule` рядом с `APP_INTERCEPTOR`.
+- [ ] **Global exception filter**: `src/libs/exceptions/domain-exception.filter.ts` — маппит ошибки из домена (например `new Error('Cannot complete a step out of order')`) в `HttpException`. Сейчас домен бросает голые `Error`, контроллер отдаст 500 (а с `CommandBus` ошибка вырывается из `commandBus.execute` без обёртки). Завести базовые типы: `DomainError`, `ConflictError`, `NotFoundError`, `ForbiddenError`. Зарегистрировать `APP_FILTER` в `AppModule` рядом с `APP_INTERCEPTOR`.
 - [ ] **Заменить `throw new Error(...)` в `OnboardingEntity`/`OnboardingChatEntity`/`OnboardingTemplateEntity`** на доменные классы из пункта выше. Прямо сейчас это работает, но `cancel()` бросает `Error`, который наружу выйдет как 500.
 - [ ] **Swagger**: подключить `@nestjs/swagger` + `nestjs-zod` адаптер (`patchNestJsSwagger()`), смонтировать на `/docs`. Без этого фронт будет писаться вслепую.
 - [ ] **Логгер с correlationId**: `ContextInterceptor` уже кладёт `requestId`. Сделать `LoggerService` (pino?), который читает его из `RequestContextService.getRequestId()` и добавляет в каждый лог. Подключить через `app.useLogger(...)` в `src/main.ts`.

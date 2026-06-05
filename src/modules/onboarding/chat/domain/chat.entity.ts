@@ -6,7 +6,6 @@ import {
 } from '@/modules/onboarding/chat/chat.types';
 
 export class OnboardingChatEntity extends Entity<OnboardingChatProps> {
-  protected readonly _id: AggregateId;
   private readonly _pendingMessages: OnboardingChatMessageProps[] = [];
 
   private constructor(props: OnboardingChatProps, id: AggregateId) {

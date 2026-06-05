@@ -1,12 +1,17 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, NotFoundException } from '@nestjs/common';
+import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { SendOnboardingChatMessageCommand } from '@/modules/onboarding/chat/application/send-message/send-message.command';
 import { ONBOARDING_CHAT_REPOSITORY } from '@/modules/onboarding/chat/application/ports/chat.repository.port';
 import type { OnboardingChatRepositoryPort } from '@/modules/onboarding/chat/application/ports/chat.repository.port';
 import { ONBOARDING_REPOSITORY } from '@/modules/onboarding/assignment/application/ports/onboarding.repository.port';
 import type { OnboardingRepositoryPort } from '@/modules/onboarding/assignment/application/ports/onboarding.repository.port';
+import { IdResponseDto } from '@/libs/api/dto';
 
-@Injectable()
-export class SendOnboardingChatMessageHandler {
+@CommandHandler(SendOnboardingChatMessageCommand)
+export class SendOnboardingChatMessageHandler implements ICommandHandler<
+  SendOnboardingChatMessageCommand,
+  IdResponseDto
+> {
   constructor(
     @Inject(ONBOARDING_CHAT_REPOSITORY)
     private readonly chatRepository: OnboardingChatRepositoryPort,
@@ -16,7 +21,7 @@ export class SendOnboardingChatMessageHandler {
 
   async execute(
     command: SendOnboardingChatMessageCommand,
-  ): Promise<{ id: string }> {
+  ): Promise<IdResponseDto> {
     return this.chatRepository.transaction(async () => {
       const onboarding = await this.onboardingRepository.findById(
         command.onboardingId,
@@ -39,7 +44,7 @@ export class SendOnboardingChatMessageHandler {
         allowedSenderIds: [o.assignedById, o.assignedToId],
       });
       await this.chatRepository.save(c);
-      return { id: message.id };
+      return new IdResponseDto(message.id);
     });
   }
 }

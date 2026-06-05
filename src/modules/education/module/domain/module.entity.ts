@@ -1,4 +1,4 @@
-import { AggregateId, Entity } from '@/libs/ddd/entity.base';
+import { Entity } from '@/libs/ddd/entity.base';
 import {
   CreateModuleProps,
   ModuleProps,
@@ -6,8 +6,6 @@ import {
 import { randomUUID } from 'node:crypto';
 
 export class ModuleEntity extends Entity<ModuleProps> {
-  protected readonly _id: AggregateId;
-
   private constructor(props: CreateModuleProps) {
     super({
       id: randomUUID(),

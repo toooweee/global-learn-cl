@@ -7,8 +7,6 @@ import {
 } from '@/modules/onboarding/template/template.types';
 
 export class OnboardingTemplateEntity extends Entity<OnboardingTemplateProps> {
-  protected readonly _id: AggregateId;
-
   private constructor(props: OnboardingTemplateProps, id: AggregateId) {
     super({ id, props });
   }

@@ -31,9 +31,9 @@ Local infra (`docker-compose.yaml` + `docker-compose.local.yaml`) brings up Post
 The codebase follows a DDD + CQRS layering. Each domain module under `src/modules/<bounded-context>/<aggregate>/` is sliced into:
 
 - `domain/` — entities/aggregates extending `libs/ddd/entity.base.ts` (private constructor + static `create`, props frozen via `getProps()`).
-- `application/` — use cases. Commands extend `libs/application/command.base.ts` (auto-fills `correlationId` from request context); each use case is a sibling pair `*.command.ts` + `*.command-handler.ts`. Repository **ports** (interfaces) live here under `application/ports/` or `*.repository.port.ts`.
+- `application/` — use cases dispatched via **`@nestjs/cqrs`**. Commands extend `libs/application/command.base.ts` (`Command implements ICommand`, auto-fills `correlationId` from request context); queries extend `libs/application/query.base.ts` (`Query implements IQuery`). Each use case is a sibling pair `*.command.ts` + `*.command-handler.ts`; the handler class is decorated with `@CommandHandler(MyCommand)` and `implements ICommandHandler<MyCommand, TResult>`. Controllers never inject handlers directly — they dispatch through `CommandBus.execute(...)` / `QueryBus.execute(...)`. Each module that uses handlers must `imports: [CqrsModule]`. Repository **ports** (interfaces) live here under `application/ports/` or `*.repository.port.ts`.
 - `infra/` — Prisma repository adapters extending `infra/prisma/prisma.repository.base.ts`.
-- `presentation/` — Nest controllers.
+- `presentation/` — Nest controllers + a `dto/` subfolder with class-validator DTOs.
 
 `<aggregate>.types.ts` at the module root defines `Props` (full shape, incl. timestamps) and `CreateProps` (input to `Entity.create`).
 
@@ -50,16 +50,18 @@ Command handlers compose multiple repository calls inside a single `repo.transac
 ### Other conventions
 
 - Path alias `@/*` → `src/*`; `@generated` / `@generated/*` → `generated/prisma`. Build relies on **`tsc-alias`** to rewrite these in emitted JS — don't drop it from the `build` script.
-- Env access goes through `EnvService.get(...)` backed by `EnvSchema` (Zod) in `src/infra/env/env.ts`. Add new variables to the schema; never read `process.env` directly in app code.
+- Env access goes through `EnvService.get(...)` backed by `EnvSchema` (Zod) in `src/infra/env/env.ts`. Add new variables to the schema; never read `process.env` directly in app code. **`zod` is used only for env validation** — do not pull it into HTTP layer.
 - `oxide.ts` `Option<T>` is the convention for nullable repo lookups (`findById` returns `Option<Entity>`).
-- Validation uses `nestjs-zod` + `zod` (not `class-validator`).
+- HTTP DTOs use **`class-validator` + `class-transformer`**. A global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` and `ClassSerializerInterceptor` are wired in `src/main.ts`. DTOs live in `presentation/dto/*.dto.ts`; controllers accept them with bare `@Body() dto: SomeDto` (the pipe transforms+validates).
+- Response classes live in `src/libs/application/` and use class-level `@Exclude()` + per-field `@Expose()` so unmarked fields don't leak. Conventions: `IdResponseDto` for create endpoints, `BaseResponseDto` (`id`, `createdAt`, `updatedAt`) as a base for resource read-models, `PaginatedResponseDto<T>` wrapping the repo's `Paginated<T>`.
+- Inject types from repository ports with `import type` to avoid TS1272 (decorator metadata + `isolatedModules`); inject the DI token (e.g. `ONBOARDING_REPOSITORY` `Symbol`) with `@Inject(...)`.
 - IDs are `randomUUID()` generated inside the entity constructor; `AggregateId` is just `string`.
 
 ### Module wiring
 
 `AppModule` imports the modules that are wired up so far (currently `UserModule` and `OnboardingModule` plus infra modules `EnvModule`, `PrismaModule`, `RequestContextModule`). Many feature modules under `src/modules/education/*`, `employee`, `identity/auth`, `identity/token` exist as in-progress slices and are not all registered yet — when adding a new module, import it into `AppModule`.
 
-> Heads up — `OnboardingModule` (in `src/modules/onboarding/`) carries three aggregates in one Nest module: `template/`, `assignment/` (the running onboarding), and `chat/`. The three repository ports are bound to Prisma adapters via `Symbol` tokens (`ONBOARDING_TEMPLATE_REPOSITORY`, `ONBOARDING_REPOSITORY`, `ONBOARDING_CHAT_REPOSITORY`); inject them with `@Inject(...)` and bring the implementation in with `import type` to satisfy `isolatedModules` + `emitDecoratorMetadata`.
+> Heads up — `OnboardingModule` (in `src/modules/onboarding/`) carries three aggregates in one Nest module: `template/`, `assignment/` (the running onboarding), and `chat/`. The three repository ports are bound to Prisma adapters via `Symbol` tokens (`ONBOARDING_TEMPLATE_REPOSITORY`, `ONBOARDING_REPOSITORY`, `ONBOARDING_CHAT_REPOSITORY`). The module imports `CqrsModule`; handlers are decorated with `@CommandHandler(...)` and registered in `providers`. Controllers inject `CommandBus` (never the handlers directly).
 
 ## Database schema
 

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 import { PrismaModule } from '@/infra/prisma/prisma.module';
 
 import { ONBOARDING_TEMPLATE_REPOSITORY } from '@/modules/onboarding/template/application/ports/template.repository.port';
@@ -18,7 +19,7 @@ import { SendOnboardingChatMessageHandler } from '@/modules/onboarding/chat/appl
 import { OnboardingChatController } from '@/modules/onboarding/chat/presentation/chat.controller';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [CqrsModule, PrismaModule],
   controllers: [
     OnboardingTemplateController,
     OnboardingController,

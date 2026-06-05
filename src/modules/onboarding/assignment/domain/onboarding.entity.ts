@@ -39,8 +39,6 @@ export interface AssignAdHocProps {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export class OnboardingEntity extends Entity<OnboardingProps> {
-  protected readonly _id: AggregateId;
-
   private constructor(props: OnboardingProps, id: AggregateId) {
     super({ id, props });
   }

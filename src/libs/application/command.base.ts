@@ -1,5 +1,6 @@
-import { RequestContextService } from '@/libs/application/context/app-request-context';
+import { ICommand } from '@nestjs/cqrs';
 import { randomUUID } from 'node:crypto';
+import { RequestContextService } from '@/libs/application/context/app-request-context';
 
 type CommandProps<T> = Omit<T, 'id' | 'metadata'> & Partial<Command>;
 
@@ -9,7 +10,7 @@ type CommandMetadata = {
   readonly timestamp: number;
 };
 
-export class Command {
+export class Command implements ICommand {
   readonly id: string;
   readonly metadata: CommandMetadata;
 

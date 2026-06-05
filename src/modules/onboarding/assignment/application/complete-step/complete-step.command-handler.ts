@@ -1,10 +1,14 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, NotFoundException } from '@nestjs/common';
+import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { CompleteOnboardingStepCommand } from '@/modules/onboarding/assignment/application/complete-step/complete-step.command';
 import { ONBOARDING_REPOSITORY } from '@/modules/onboarding/assignment/application/ports/onboarding.repository.port';
 import type { OnboardingRepositoryPort } from '@/modules/onboarding/assignment/application/ports/onboarding.repository.port';
 
-@Injectable()
-export class CompleteOnboardingStepHandler {
+@CommandHandler(CompleteOnboardingStepCommand)
+export class CompleteOnboardingStepHandler implements ICommandHandler<
+  CompleteOnboardingStepCommand,
+  void
+> {
   constructor(
     @Inject(ONBOARDING_REPOSITORY)
     private readonly repository: OnboardingRepositoryPort,
