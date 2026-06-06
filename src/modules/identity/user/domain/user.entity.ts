@@ -18,7 +18,7 @@ export class UserEntity extends Entity<UserProps> {
     });
   }
 
-  static recreate(props: RecreateUserProps) {
-    return new UserEntity({ id: props.id, props: props });
+  static recreate({ id, props }: RecreateUserProps) {
+    return new UserEntity({ id, props });
   }
 }

@@ -7,6 +7,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ContextInterceptor } from '@/libs/application/context/context.interceptor';
 import { UserModule } from '@/modules/identity/user/user.module';
 import { OnboardingModule } from '@/modules/onboarding/onboarding.module';
+import { CqrsModule } from '@nestjs/cqrs';
 
 const interceptors = [
   {
@@ -17,6 +18,7 @@ const interceptors = [
 
 @Module({
   imports: [
+    CqrsModule.forRoot(),
     RequestContextModule,
     EnvModule,
     PrismaModule,

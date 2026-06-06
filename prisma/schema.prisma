@@ -13,11 +13,11 @@ datasource db {
 // ============================================================
 
 model User {
-  id             String    @id @default(uuid()) @db.Uuid
-  email          String    @unique @db.VarChar(255)
-  hashedPassword String    @map("hashed_password") @db.VarChar(255)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  email          String   @unique @db.VarChar(255)
+  hashedPassword String   @map("hashed_password") @db.VarChar(255)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   employee      Employee?
   client        Client?
@@ -28,10 +28,10 @@ model User {
 }
 
 model Role {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @unique @db.VarChar(64)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   users UserRole[]
 
@@ -54,10 +54,10 @@ model UserRole {
 // ============================================================
 
 model Department {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @unique @db.VarChar(255)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   divisions Division[]
 
@@ -65,11 +65,11 @@ model Department {
 }
 
 model Division {
-  id           String    @id @default(uuid()) @db.Uuid
-  name         String    @unique @db.VarChar(255)
-  departmentId String    @map("department_id") @db.Uuid
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @unique @db.VarChar(255)
+  departmentId String   @map("department_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   department          Department           @relation(fields: [departmentId], references: [id])
   employees           Employee[]
@@ -79,10 +79,10 @@ model Division {
 }
 
 model Position {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @unique @db.VarChar(255)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   employees           Employee[]
   onboardingTemplates OnboardingTemplate[]
@@ -100,7 +100,7 @@ model Employee {
   positionId     String?   @map("position_id") @db.Uuid
   avatarId       String?   @map("avatar_id") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   user     User      @relation(fields: [id], references: [id], onDelete: Cascade)
   division Division  @relation(fields: [divisionId], references: [id])
@@ -118,11 +118,11 @@ model Employee {
 }
 
 model ClientCompany {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @db.VarChar(255)
-  avatarId  String?   @map("avatar_id") @db.Uuid
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  avatarId  String?  @map("avatar_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   avatar  File?    @relation("ClientCompanyAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
   clients Client[]
@@ -131,12 +131,12 @@ model ClientCompany {
 }
 
 model Client {
-  id        String    @id @db.Uuid
-  fullname  String    @db.VarChar(255)
-  avatarId  String?   @map("avatar_id") @db.Uuid
-  companyId String    @map("company_id") @db.Uuid
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id        String   @id @db.Uuid
+  fullname  String   @db.VarChar(255)
+  avatarId  String?  @map("avatar_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   user    User          @relation(fields: [id], references: [id], onDelete: Cascade)
   avatar  File?         @relation("ClientAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
@@ -168,13 +168,13 @@ model File {
 // ============================================================
 
 model Course {
-  id          String    @id @default(uuid()) @db.Uuid
-  name        String    @db.VarChar(255)
-  description String    @db.Text
-  authorId    String    @map("author_id") @db.Uuid
-  coverId     String?   @map("cover_id") @db.Uuid
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(255)
+  description String   @db.Text
+  authorId    String   @map("author_id") @db.Uuid
+  coverId     String?  @map("cover_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   author                  Employee                 @relation("CourseAuthor", fields: [authorId], references: [id])
   cover                   File?                    @relation("CourseCover", fields: [coverId], references: [id], onDelete: SetNull)
@@ -227,10 +227,10 @@ model Step {
 }
 
 model Lesson {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @db.Text
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   steps Step[]
 
@@ -238,10 +238,10 @@ model Lesson {
 }
 
 model Test {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @db.Text
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   questions TestQuestion[]
   attempts  TestAttempt[]
@@ -339,7 +339,7 @@ model CourseEnrollment {
   startedAt   DateTime         @default(now()) @map("started_at") @db.Timestamptz
   completedAt DateTime?        @map("completed_at") @db.Timestamptz
   createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime?        @updatedAt @map("updated_at") @db.Timestamptz
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   course   Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   employee Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -355,7 +355,7 @@ model StepProgress {
   enrollmentId String    @map("enrollment_id") @db.Uuid
   completedAt  DateTime? @map("completed_at") @db.Timestamptz
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   step       Step             @relation(fields: [stepId], references: [id], onDelete: Cascade)
   enrollment CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
@@ -384,14 +384,14 @@ enum OnboardingStatus {
 }
 
 model OnboardingTemplate {
-  id          String    @id @default(uuid()) @db.Uuid
-  name        String    @db.VarChar(255)
-  description String    @db.Text
-  positionId  String    @map("position_id") @db.Uuid
-  divisionId  String    @map("division_id") @db.Uuid
-  coverId     String?   @map("cover_id") @db.Uuid
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(255)
+  description String   @db.Text
+  positionId  String   @map("position_id") @db.Uuid
+  divisionId  String   @map("division_id") @db.Uuid
+  coverId     String?  @map("cover_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   position    Position                 @relation(fields: [positionId], references: [id])
   division    Division                 @relation(fields: [divisionId], references: [id])
@@ -415,7 +415,7 @@ model OnboardingTemplateStep {
   recommendedEndOffsetDays   Int                @map("recommended_end_offset_days")
   coverId                    String?            @map("cover_id") @db.Uuid
   createdAt                  DateTime           @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt                  DateTime?          @updatedAt @map("updated_at") @db.Timestamptz
+  updatedAt                  DateTime           @updatedAt @map("updated_at") @db.Timestamptz
 
   template        OnboardingTemplate                     @relation(fields: [templateId], references: [id], onDelete: Cascade)
   course          Course?                                @relation(fields: [courseId], references: [id], onDelete: SetNull)
@@ -448,7 +448,7 @@ model Onboarding {
   endDate      DateTime         @map("end_date") @db.Timestamptz
   completedAt  DateTime?        @map("completed_at") @db.Timestamptz
   createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime?        @updatedAt @map("updated_at") @db.Timestamptz
+  updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   template   OnboardingTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   assignedBy Employee            @relation("OnboardingAssignedBy", fields: [assignedById], references: [id])
@@ -473,7 +473,7 @@ model OnboardingStep {
   feedbackText         String?            @map("feedback_text") @db.Text
   completedAt          DateTime?          @map("completed_at") @db.Timestamptz
   createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime?          @updatedAt @map("updated_at") @db.Timestamptz
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz
 
   onboarding         Onboarding                        @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
   course             Course?                           @relation(fields: [courseId], references: [id], onDelete: SetNull)

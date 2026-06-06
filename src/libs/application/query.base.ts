@@ -1,13 +1,29 @@
+import { RequestContextService } from '@/libs/application/context';
+
+export interface QueryMetadata {
+  readonly correlationId: string;
+  readonly timestamp: number;
+}
+
+export class Query {
+  readonly metadata: QueryMetadata;
+
+  constructor() {
+    this.metadata = {
+      correlationId: RequestContextService.getRequestId(),
+      timestamp: Date.now(),
+    };
+  }
+}
+
+export type OrderBy = { field: string | true; param: 'asc' | 'desc' };
+
 export type PaginatedQueryParams = {
   limit: number;
   page: number;
   offset: number;
   orderBy: OrderBy;
 };
-
-export abstract class QueryBase {}
-
-export type OrderBy = { field: string | true; param: 'asc' | 'desc' };
 
 export type PaginatedParams<T> = Omit<
   T,
@@ -29,17 +45,17 @@ export class Paginated<T> {
   }
 }
 
-export abstract class PaginatedQueryBase extends QueryBase {
+export class PaginatedQueryBase extends Query {
   limit: number;
   offset: number;
-  orderBy: OrderBy;
   page: number;
+  orderBy: OrderBy;
 
   constructor(props: PaginatedParams<PaginatedQueryBase>) {
     super();
-    this.limit = props.limit || 9;
-    this.offset = props.page ? props.page * this.limit : 0;
-    this.page = props.page || 0;
+    this.limit = props.limit || 20;
+    this.offset = (this.page - 1) * this.limit;
+    this.page = props.page || 1;
     this.orderBy = props.orderBy || { field: true, param: 'desc' };
   }
 }

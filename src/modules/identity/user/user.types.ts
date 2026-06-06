@@ -14,8 +14,5 @@ export interface CreateUserProps {
 
 export interface RecreateUserProps {
   id: AggregateId;
-  email: string;
-  hashedPassword: string;
-  createdAt: Date;
-  updatedAt: Date;
+  props: UserProps;
 }

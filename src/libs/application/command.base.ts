@@ -2,7 +2,7 @@ import { ICommand } from '@nestjs/cqrs';
 import { randomUUID } from 'node:crypto';
 import { RequestContextService } from '@/libs/application/context/app-request-context';
 
-type CommandProps<T> = Omit<T, 'id' | 'metadata'> & Partial<Command>;
+export type CommandProps<T> = Omit<T, 'id' | 'metadata'> & Partial<Command>;
 
 type CommandMetadata = {
   readonly correlationId: string;
