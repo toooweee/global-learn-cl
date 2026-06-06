@@ -4,13 +4,13 @@ export class ApplicationException extends Error {
 
   constructor(
     message: string,
-    code = 'APPLICATION_EXCEPTION',
     statusCode = 500,
+    code = 'APPLICATION_EXCEPTION',
   ) {
     super(message);
     this.name = this.constructor.name;
-    this.code = code;
     this.statusCode = statusCode;
+    this.code = code;
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }

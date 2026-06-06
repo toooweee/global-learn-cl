@@ -30,8 +30,8 @@ export class CreateUserCommandHandler implements ICommandHandler<CreateUserComma
       if (!userOption.isNone()) {
         throw new ApplicationException(
           'User already exists',
-          'USER_ALREADY_EXISTS',
           409,
+          'USER_ALREADY_EXISTS',
         );
       }
 

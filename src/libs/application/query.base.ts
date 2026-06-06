@@ -27,35 +27,35 @@ export type PaginatedQueryParams = {
 
 export type PaginatedParams<T> = Omit<
   T,
-  'limit' | 'offset' | 'orderBy' | 'page'
+  'limit' | 'page' | 'offset' | 'orderBy' | 'metadata'
 > &
   Partial<Omit<PaginatedQueryParams, 'offset'>>;
 
 export class Paginated<T> {
-  readonly count: number;
   readonly limit: number;
   readonly page: number;
+  readonly count: number;
   readonly data: readonly T[];
 
   constructor(props: Paginated<T>) {
-    this.count = props.count;
     this.limit = props.limit;
     this.page = props.page;
+    this.count = props.count;
     this.data = props.data;
   }
 }
 
-export class PaginatedQueryBase extends Query {
+export class PaginatedQuery extends Query {
   limit: number;
-  offset: number;
   page: number;
+  offset: number;
   orderBy: OrderBy;
 
-  constructor(props: PaginatedParams<PaginatedQueryBase>) {
+  constructor(props: PaginatedParams<PaginatedQuery>) {
     super();
     this.limit = props.limit || 20;
-    this.offset = (this.page - 1) * this.limit;
     this.page = props.page || 1;
+    this.offset = (this.page - 1) * this.limit;
     this.orderBy = props.orderBy || { field: true, param: 'desc' };
   }
 }
