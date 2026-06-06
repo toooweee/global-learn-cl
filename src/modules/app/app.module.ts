@@ -1,19 +1,24 @@
-import { Module } from '@nestjs/common';
+import { Module, Provider } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { EnvModule } from '@/infra/env/env.module';
 import { PrismaModule } from '@/infra/prisma/prisma.module';
 import { RequestContextModule } from 'nestjs-request-context';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ContextInterceptor } from '@/libs/application/context/context.interceptor';
 import { UserModule } from '@/modules/identity/user/user.module';
 import { OnboardingModule } from '@/modules/onboarding/onboarding.module';
 import { CqrsModule } from '@nestjs/cqrs';
+import { AllExceptionsFilter } from '@/infra/exception-filters/all-exceptions.filter';
 
 const interceptors = [
   {
     provide: APP_INTERCEPTOR,
     useClass: ContextInterceptor,
   },
+];
+
+const exceptionFilters: Provider[] = [
+  { provide: APP_FILTER, useClass: AllExceptionsFilter },
 ];
 
 @Module({
@@ -26,6 +31,6 @@ const interceptors = [
     OnboardingModule,
   ],
   controllers: [AppController],
-  providers: [...interceptors],
+  providers: [...interceptors, ...exceptionFilters],
 })
 export class AppModule {}

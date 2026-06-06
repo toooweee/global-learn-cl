@@ -7,7 +7,7 @@ import {
 import { Inject } from '@nestjs/common';
 import { UserEntity } from '@/modules/identity/user/domain/user.entity';
 import * as argon from 'argon2';
-import { Ok } from 'oxide.ts';
+import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 
 @CommandHandler(CreateUserCommand)
 export class CreateUserCommandHandler implements ICommandHandler<CreateUserCommand> {
@@ -28,12 +28,16 @@ export class CreateUserCommandHandler implements ICommandHandler<CreateUserComma
       const userOption = await this.userRepository.findByEmail(email);
 
       if (!userOption.isNone()) {
-        throw new Error();
+        throw new ApplicationException(
+          'User already exists',
+          'USER_ALREADY_EXISTS',
+          409,
+        );
       }
 
       await this.userRepository.save(user);
     });
 
-    return Ok(user.id);
+    return user.id;
   }
 }

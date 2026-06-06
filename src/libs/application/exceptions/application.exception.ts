@@ -1,11 +1,11 @@
-export class DomainException extends Error {
+export class ApplicationException extends Error {
   readonly code: string;
   readonly statusCode: number;
 
   constructor(
     message: string,
-    code = 'DOMAIN_VALIDATION_EXCEPTION',
-    statusCode = 400,
+    code = 'APPLICATION_EXCEPTION',
+    statusCode = 500,
   ) {
     super(message);
     this.name = this.constructor.name;

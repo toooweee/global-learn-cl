@@ -1,11 +1,12 @@
 import { Command, CommandProps } from '@/libs/application';
 
 export class CreateUserCommand extends Command {
-  constructor(
-    props: CommandProps<CreateUserCommand>,
-    readonly email: string,
-    readonly password: string,
-  ) {
+  readonly email: string;
+  readonly password: string;
+
+  constructor(props: CommandProps<CreateUserCommand>) {
     super(props);
+    this.email = props.email;
+    this.password = props.password;
   }
 }

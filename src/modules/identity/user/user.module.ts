@@ -4,6 +4,7 @@ import { USER_REPOSITORY } from '@/modules/identity/user/application/ports/user.
 import { UserPrismaRepository } from '@/modules/identity/user/infra/user-prisma.repository';
 import { CreateUserCommandHandler } from '@/modules/identity/user/application/commands/create-user/create-user.command-handler';
 import { UserController } from '@/modules/identity/user/presentation/user.controller';
+import { UserMapper } from '@/modules/identity/user/user.mapper';
 
 const repositories: Provider[] = [
   {
@@ -17,6 +18,6 @@ const commandHandlers: Provider[] = [CreateUserCommandHandler];
 @Module({
   imports: [PrismaModule],
   controllers: [UserController],
-  providers: [...repositories, ...commandHandlers],
+  providers: [...repositories, ...commandHandlers, UserMapper],
 })
 export class UserModule {}
