@@ -1,4 +1,4 @@
-import { Inject, NotFoundException } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { SendOnboardingChatMessageCommand } from '@/modules/onboarding/chat/application/send-message/send-message.command';
 import { ONBOARDING_CHAT_REPOSITORY } from '@/modules/onboarding/chat/application/ports/chat.repository.port';
@@ -6,6 +6,7 @@ import type { OnboardingChatRepositoryPort } from '@/modules/onboarding/chat/app
 import { ONBOARDING_REPOSITORY } from '@/modules/onboarding/assignment/application/ports/onboarding.repository.port';
 import type { OnboardingRepositoryPort } from '@/modules/onboarding/assignment/application/ports/onboarding.repository.port';
 import { IdResponseDto } from '@/libs/api/dto';
+import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 
 @CommandHandler(SendOnboardingChatMessageCommand)
 export class SendOnboardingChatMessageHandler implements ICommandHandler<
@@ -27,7 +28,11 @@ export class SendOnboardingChatMessageHandler implements ICommandHandler<
         command.onboardingId,
       );
       if (onboarding.isNone()) {
-        throw new NotFoundException('Onboarding not found');
+        throw new ApplicationException(
+          'Onboarding not found',
+          404,
+          'ONBOARDING_NOT_FOUND',
+        );
       }
       const o = onboarding.unwrap().getProps();
 
@@ -35,7 +40,11 @@ export class SendOnboardingChatMessageHandler implements ICommandHandler<
         command.onboardingId,
       );
       if (chat.isNone()) {
-        throw new NotFoundException('Chat not found for this onboarding');
+        throw new ApplicationException(
+          'Chat not found for this onboarding',
+          404,
+          'ONBOARDING_CHAT_NOT_FOUND',
+        );
       }
       const c = chat.unwrap();
       const message = c.postMessage({

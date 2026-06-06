@@ -1,33 +1,39 @@
 import { randomUUID } from 'node:crypto';
-import { AggregateId, Entity } from '@/libs/ddd/entity.base';
+import { AggregateId, CreateEntityProps, Entity } from '@/libs/ddd/entity.base';
+import { DomainException } from '@/libs/ddd/domain.exception';
 import {
   OnboardingChatMessageProps,
   OnboardingChatProps,
 } from '@/modules/onboarding/chat/chat.types';
 
+export interface RecreateOnboardingChatProps {
+  id: AggregateId;
+  props: OnboardingChatProps;
+}
+
 export class OnboardingChatEntity extends Entity<OnboardingChatProps> {
   private readonly _pendingMessages: OnboardingChatMessageProps[] = [];
 
-  private constructor(props: OnboardingChatProps, id: AggregateId) {
-    super({ id, props });
+  protected constructor(props: CreateEntityProps<OnboardingChatProps>) {
+    super(props);
   }
 
   static create(onboardingId: string): OnboardingChatEntity {
-    return new OnboardingChatEntity(
-      {
+    return new OnboardingChatEntity({
+      id: randomUUID(),
+      props: {
         onboardingId,
         messages: [],
         createdAt: new Date(),
       },
-      randomUUID(),
-    );
+    });
   }
 
-  static hydrate(
-    props: OnboardingChatProps,
-    id: AggregateId,
-  ): OnboardingChatEntity {
-    return new OnboardingChatEntity(props, id);
+  static recreate({
+    id,
+    props,
+  }: RecreateOnboardingChatProps): OnboardingChatEntity {
+    return new OnboardingChatEntity({ id, props });
   }
 
   postMessage(input: {
@@ -36,11 +42,18 @@ export class OnboardingChatEntity extends Entity<OnboardingChatProps> {
     allowedSenderIds: ReadonlyArray<string>;
   }): OnboardingChatMessageProps {
     if (!input.allowedSenderIds.includes(input.senderId)) {
-      throw new Error('Sender is not a participant in this chat');
+      throw new DomainException(
+        'Sender is not a participant in this chat',
+        'ONBOARDING_CHAT_SENDER_FORBIDDEN',
+        403,
+      );
     }
     const body = input.body.trim();
     if (body.length === 0) {
-      throw new Error('Message body cannot be empty');
+      throw new DomainException(
+        'Message body cannot be empty',
+        'ONBOARDING_CHAT_EMPTY_BODY',
+      );
     }
     const message: OnboardingChatMessageProps = {
       id: randomUUID(),

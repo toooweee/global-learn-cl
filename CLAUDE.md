@@ -30,38 +30,92 @@ Local infra (`docker-compose.yaml` + `docker-compose.local.yaml`) brings up Post
 
 The codebase follows a DDD + CQRS layering. Each domain module under `src/modules/<bounded-context>/<aggregate>/` is sliced into:
 
-- `domain/` — entities/aggregates extending `libs/ddd/entity.base.ts` (private constructor + static `create`, props frozen via `getProps()`).
-- `application/` — use cases dispatched via **`@nestjs/cqrs`**. Commands extend `libs/application/command.base.ts` (`Command implements ICommand`, auto-fills `correlationId` from request context); queries extend `libs/application/query.base.ts` (`Query implements IQuery`). Each use case is a sibling pair `*.command.ts` + `*.command-handler.ts`; the handler class is decorated with `@CommandHandler(MyCommand)` and `implements ICommandHandler<MyCommand, TResult>`. Controllers never inject handlers directly — they dispatch through `CommandBus.execute(...)` / `QueryBus.execute(...)`. Each module that uses handlers must `imports: [CqrsModule]`. Repository **ports** (interfaces) live here under `application/ports/` or `*.repository.port.ts`.
+- `domain/` — entities/aggregates extending `libs/ddd/entity.base.ts`. `Entity` has a `protected` constructor (subclasses also use `protected`) and exposes the props through a frozen `getProps()`. Subclasses provide **two** static factories: `create(props)` for brand-new aggregates (generates the `id` via `randomUUID()` and stamps `createdAt`/`updatedAt`), and `recreate({ id, props })` for hydration from persistence (used by the mapper's `toDomain`).
+- `application/` — use cases dispatched via **`@nestjs/cqrs`**. Commands extend `libs/application/command.base.ts` (`Command implements ICommand`, auto-fills `id`, `correlationId` from `RequestContextService`, and `timestamp`); queries extend `libs/application/query.base.ts` (plain `Query` with `correlationId` + `timestamp`, or `PaginatedQuery` for list endpoints — pre-computes `offset` from `limit`/`page` and defaults `orderBy` to `{ field: true, param: 'desc' }`, where `field: true` means "use the handler's default field"). Each use case is a sibling pair `*.command.ts` + `*.command-handler.ts` (and `*.query.ts` + `*.query-handler.ts`); the handler class is decorated with `@CommandHandler(MyCommand)` / `@QueryHandler(MyQuery)` and `implements ICommandHandler<MyCommand, TResult>` / `IQueryHandler<...>`. Controllers never inject handlers directly — they dispatch through `CommandBus.execute(...)` / `QueryBus.execute(...)`. **`CqrsModule.forRoot()` is registered globally in `AppModule`**, so feature modules generally do not re-import it (the older `OnboardingModule` still imports it explicitly; newer modules like `UserModule` rely on the global registration). Repository **ports** (interfaces) live here under `application/ports/` or `*.repository.port.ts`.
 - `infra/` — Prisma repository adapters extending `infra/prisma/prisma.repository.base.ts`.
-- `presentation/` — Nest controllers + a `dto/` subfolder with class-validator DTOs.
+- `presentation/` — Nest controllers + a `dto/` subfolder with class-validator request DTOs and class-based response DTOs.
 
-`<aggregate>.types.ts` at the module root defines `Props` (full shape, incl. timestamps) and `CreateProps` (input to `Entity.create`).
+`<aggregate>.types.ts` at the module root defines `Props` (full shape, incl. timestamps), `CreateProps` (input to `Entity.create`), and `RecreateProps` (`{ id; props }` — input to `Entity.recreate`).
 
-### Request-scoped transactions
+### Mappers
 
-Transaction propagation is implicit, not parameter-passed:
+Each aggregate has an `@Injectable()` `<Aggregate>Mapper` at the module root (e.g. `src/modules/identity/user/user.mapper.ts`, `src/modules/onboarding/template/template.mapper.ts`). `libs/ddd/mapper.interface.ts` exposes the full `Mapper<DomainEntity, DbRecord, ResponseDto>` (three methods) **and** three smaller pieces: `ToDomain`, `ToPersistence`, `ToResponse`. Flat aggregates (User) implement the full `Mapper`. Tree aggregates (Onboarding template / assignment / chat) implement just `ToDomain` — `toPersistence` doesn't fit a single shape for nested create-vs-update and is inlined in the repo; `toResponse` is added only when a read-side endpoint actually needs it.
 
-1. `ContextInterceptor` (`APP_INTERCEPTOR` in `AppModule`) puts an `AppRequestContext` on every request via `nestjs-request-context`.
-2. `PrismaRepositoryBase.transaction(handler)` opens a Prisma `$transaction`, stashes the `tx` client on the context via `RequestContextService.setTransactionConnection`, runs `handler`, then clears it.
-3. Inside `PrismaRepositoryBase`, the `db` getter returns the context's `tx` if present, else the singleton `PrismaService.client`. **Always read through `this.db`, never `this.prismaService.client` directly**, otherwise the repo escapes the active transaction.
+- `toDomain(record)` — hydrates an entity via `Entity.recreate({ id, props })`.
+- `toPersistence(entity)` — flattens the entity to a Prisma row (when applicable).
+- `toResponse(entity)` — constructs a presentation-layer `ResponseDto` (when applicable).
+
+The mapper is registered in the module's `providers` (alongside the repo binding and handlers) and injected into the Prisma repository.
+
+**Always type `DbRecord` from `@generated/client`** — never hand-roll record shapes. For flat aggregates, import the model type directly (e.g. `import { User } from '@generated/client'`). For tree aggregates with nested `include`, export an `<aggregate>Include` constant from the mapper using `satisfies Prisma.<Model>Include` and derive `<Aggregate>Record = Prisma.<Model>GetPayload<{ include: typeof <aggregate>Include }>`. The repository imports both — uses the constant in `findUnique({ include })` calls, the type in the mapper signature. Example: `src/modules/onboarding/template/template.mapper.ts` exports `onboardingTemplateInclude` and `OnboardingTemplateRecord`. This keeps Prisma queries and mapper input in sync — if you add a relation to the include, the type expands and `toDomain` stops compiling until you handle the new field.
+
+### Read-side queries can bypass the repository
+
+Command handlers go through the repository + mapper (write side). Query handlers may either go through the repo or **inject `PrismaService` directly** and return raw Prisma records — the controller then wraps them in a response DTO. `FindUserQueryHandler` and `FindUsersQueryHandler` are the current examples: they hit `PrismaService.client.user.*` and return `User` (or `Paginated<User>`) rather than `UserEntity`. Pick the direct path for simple lookups/lists; reach for the repo when domain invariants or transactions are involved.
+
+### Request context + transactions
+
+Both request correlation and Prisma transaction propagation ride on the same `AppRequestContext` (`src/libs/application/context/app-request-context.ts`), exposed via the static `RequestContextService`. Two fields live on it: `requestId: string` and `prismaTransaction?: PrismaTransactionClient`.
+
+1. **`ContextInterceptor`** (registered as `APP_INTERCEPTOR` in `AppModule`) runs on every HTTP request:
+   - Resolves a `requestId` from (in order) `req.body.requestId`, the `x-request-id` header, or a freshly minted `nanoid(6)`, and stashes it via `RequestContextService.setRequestId(...)`.
+   - Logs request start/end with method, URL, status, and elapsed ms — all prefixed with `[<requestId>]`.
+2. **Command/Query base classes** read `RequestContextService.getRequestId()` at construction time and attach it as `metadata.correlationId`, so every dispatched message carries the same id as the HTTP log line.
+3. **`PrismaService`** also logs every SQL statement; the `[<requestId>]` prefix comes from `AppLogger` (see «Logger» below), so request ↔ command ↔ SQL all trace together.
+4. **`PrismaRepositoryBase.transaction(handler)`** opens a Prisma `$transaction`, stashes the `tx` client on the context via `RequestContextService.setTransactionConnection`, runs `handler`, then clears it in a `finally`.
+5. Inside `PrismaRepositoryBase`, the `db` getter returns the context's `tx` if present, else the singleton `PrismaService.client`. **Always read through `this.db`, never `this.prismaService.client` directly**, otherwise the repo escapes the active transaction. (Note: existing repos like `UserPrismaRepository` currently access `this.prismaService.client.user.*` — that's a bug to watch out for when copying patterns. New repository methods should use `this.db.<model>.*`.)
 
 Command handlers compose multiple repository calls inside a single `repo.transaction(async () => { ... })` block; sibling repos in the same request automatically see the same `tx`.
+
+### Exceptions
+
+Two domain-specific error classes, both carrying `statusCode` + `code`:
+
+- `DomainException` (`src/libs/ddd/domain.exception.ts`) — defaults `400` / `DOMAIN_VALIDATION_EXCEPTION`. Throw from entity invariants.
+- `ApplicationException` (`src/libs/application/exceptions/application.exception.ts`) — defaults `500` / `APPLICATION_EXCEPTION`. Throw from command/query handlers for use-case-level failures (auth, conflicts, not-found, …). **Constructor order is `(message, statusCode, code)`** — easy to invert.
+
+`AllExceptionsFilter` (registered as `APP_FILTER` in `AppModule`) catches everything and returns a uniform JSON body:
+
+```json
+{ "statusCode": 409, "code": "USER_ALREADY_EXISTS", "message": "User already exists",
+  "timestamp": "...", "path": "/user", "correlationId": "abc123" }
+```
+
+It special-cases `DomainException`, `ApplicationException`, and Nest's `HttpException` (joining array validation messages); anything else collapses to `500 INTERNAL_SERVER_ERROR`. The filter also logs the exception with the current `correlationId`.
+
+### Prisma service
+
+`PrismaService` (`src/infra/prisma/prisma.service.ts`) constructs a single `PrismaClient` against the **`@prisma/adapter-pg`** driver adapter (`PrismaPg({ connectionString: DATABASE_URL })`) and exposes it as `client`. It connects in `onModuleInit`, disconnects in `onModuleDestroy`, and wires the `query` event to log every SQL statement with the SQL, the params, and the duration. The `[<requestId>]` prefix is added automatically by `AppLogger`.
+
+### Logger
+
+`AppLogger` (`src/infra/logger/app.logger.ts`) extends Nest's `ConsoleLogger` and overrides `log`/`error`/`warn`/`debug`/`verbose` to prepend `[<requestId>]` to string messages, reading `requestId` from `RequestContextService.getRequestId()`. If there's no active request context (bootstrap-time logs), the prefix is skipped. Wired in `main.ts` via `app.useLogger(new AppLogger())` with `bufferLogs: true` so the early bootstrap lines are not lost. **Do not manually inline `[${requestId}]` in log messages** — the logger does it for you.
+
+### Swagger
+
+`setupSwagger(app)` (`src/infra/configs/swagger.config.ts`) mounts the Swagger UI at **`/api/docs`** with `persistAuthorization: true`. Use `@ApiOperation`, `@ApiOkResponse`, `@ApiCreatedResponse`, `@ApiPaginatedResponse(Model)`, `@ApiNotFoundResponse`, `@ApiConflictResponse`, etc. on controllers.
 
 ### Other conventions
 
 - Path alias `@/*` → `src/*`; `@generated` / `@generated/*` → `generated/prisma`. Build relies on **`tsc-alias`** to rewrite these in emitted JS — don't drop it from the `build` script.
-- Env access goes through `EnvService.get(...)` backed by `EnvSchema` (Zod) in `src/infra/env/env.ts`. Add new variables to the schema; never read `process.env` directly in app code. **`zod` is used only for env validation** — do not pull it into HTTP layer.
-- `oxide.ts` `Option<T>` is the convention for nullable repo lookups (`findById` returns `Option<Entity>`).
-- HTTP DTOs use **`class-validator` + `class-transformer`**. A global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` and `ClassSerializerInterceptor` are wired in `src/main.ts`. DTOs live in `presentation/dto/*.dto.ts`; controllers accept them with bare `@Body() dto: SomeDto` (the pipe transforms+validates).
-- Response classes live in `src/libs/application/` and use class-level `@Exclude()` + per-field `@Expose()` so unmarked fields don't leak. Conventions: `IdResponseDto` for create endpoints, `BaseResponseDto` (`id`, `createdAt`, `updatedAt`) as a base for resource read-models, `PaginatedResponseDto<T>` wrapping the repo's `Paginated<T>`.
-- Inject types from repository ports with `import type` to avoid TS1272 (decorator metadata + `isolatedModules`); inject the DI token (e.g. `ONBOARDING_REPOSITORY` `Symbol`) with `@Inject(...)`.
-- IDs are `randomUUID()` generated inside the entity constructor; `AggregateId` is just `string`.
+- Env access goes through `EnvService.get(...)` backed by `EnvSchema` (Zod) in `src/infra/env/env.ts` (current vars: `PORT`, `REDIS_IP`, `REDIS_PORT`, `DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`, `SMTP_HOST`, `SMTP_PORT`). Validation is wired through `ConfigModule.forRoot({ validate: (env) => EnvSchema.parse(env) })` in `EnvModule`. Add new variables to the schema; never read `process.env` directly in app code. **`zod` is used only for env validation** — do not pull it into HTTP layer.
+- `oxide.ts` `Option<T>` is the convention for nullable repo lookups (`findById`, `findByEmail`, etc. return `Option<Entity>`).
+- HTTP DTOs use **`class-validator` + `class-transformer`**. A global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` and `ClassSerializerInterceptor` are wired in `src/main.ts`. Request DTOs live in `presentation/dto/*.request.dto.ts`; controllers accept them with bare `@Body() dto: SomeDto` / `@Param() dto: ...` / `@Query() dto: ...` (the pipe transforms+validates).
+- **Response DTO classes live in `src/libs/api/dto/`** and use plain explicit constructors (no `@Exclude()`/`@Expose()` — only fields assigned in the constructor make it to the wire). Conventions: `IdResponseDto` for create endpoints, `BaseResponseDto` (`id`, `createdAt`, `updatedAt` — extends `IdResponseDto`, ISO-serializes dates) as a base for resource read-models, `PaginatedResponseDto<T>` wrapping the repo's `Paginated<T>` shape (`count` / `limit` / `page` / `data`). Per-aggregate response DTOs live next to the controller in `presentation/dto/<thing>.response.dto.ts` and extend `BaseResponseDto`.
+- **Shared request DTOs** live in `src/libs/api/dto/`: `IdRequestDto` for `:id` path params (validates UUID), `PaginatedQueryRequestDto` for `?limit&page` query strings (coerced to numbers via `@Type(() => Number)`).
+- **Swagger helper**: `@ApiPaginatedResponse(Model)` from `src/libs/api/decorators/` produces the `allOf: [PaginatedResponseDto, { data: Model[] }]` schema — use it on list endpoints instead of writing the schema inline.
+- **Order-by helper**: `parsePrismaOrderBy(orderBy, defaultField = 'createdAt')` in `src/infra/prisma/` turns `PaginatedQuery.orderBy` (`{ field: string | true; param: 'asc' | 'desc' }`) into Prisma's `{ [field]: param }`. When `field === true` it falls back to the handler-supplied `defaultField`.
+- Inject types from repository ports with `import type` to avoid TS1272 (decorator metadata + `isolatedModules`); inject the DI token (e.g. `USER_REPOSITORY`, `ONBOARDING_REPOSITORY` — exported `Symbol`s alongside the port interface) with `@Inject(...)`.
+- IDs are `randomUUID()` generated inside the entity's static `create()` factory (not the constructor); `AggregateId` is just `string`.
+- **Password hashing** uses `argon2` (see `CreateUserCommandHandler`).
 
 ### Module wiring
 
-`AppModule` imports the modules that are wired up so far (currently `UserModule` and `OnboardingModule` plus infra modules `EnvModule`, `PrismaModule`, `RequestContextModule`). Many feature modules under `src/modules/education/*`, `employee`, `identity/auth`, `identity/token` exist as in-progress slices and are not all registered yet — when adding a new module, import it into `AppModule`.
+`AppModule` imports `CqrsModule.forRoot()`, `RequestContextModule`, `EnvModule`, `PrismaModule`, plus the feature modules wired up so far (currently `UserModule` and `OnboardingModule`). It also registers `ContextInterceptor` as `APP_INTERCEPTOR` and `AllExceptionsFilter` as `APP_FILTER`. Many feature modules under `src/modules/education/*`, `employee`, `identity/auth`, `identity/token` exist as in-progress slices and are not all registered yet — when adding a new module, import it into `AppModule`.
 
-> Heads up — `OnboardingModule` (in `src/modules/onboarding/`) carries three aggregates in one Nest module: `template/`, `assignment/` (the running onboarding), and `chat/`. The three repository ports are bound to Prisma adapters via `Symbol` tokens (`ONBOARDING_TEMPLATE_REPOSITORY`, `ONBOARDING_REPOSITORY`, `ONBOARDING_CHAT_REPOSITORY`). The module imports `CqrsModule`; handlers are decorated with `@CommandHandler(...)` and registered in `providers`. Controllers inject `CommandBus` (never the handlers directly).
+> **`UserModule`** (`src/modules/identity/user/`) is the canonical small example: imports `PrismaModule` only (CQRS is global from `AppModule`); binds `USER_REPOSITORY` `Symbol` → `UserPrismaRepository`; registers `CreateUserCommandHandler`, `FindUserQueryHandler`, `FindUsersQueryHandler`, and `UserMapper` as providers; exposes `UserController` which dispatches via `CommandBus` / `QueryBus`. The repository port is `UserRepositoryPort extends RepositoryPort<UserEntity>` and adds `findByEmail(email): Promise<Option<UserEntity>>`. Files at the module root: `user.module.ts`, `user.types.ts` (props), `user.mapper.ts`.
+
+> **`OnboardingModule`** (`src/modules/onboarding/`) carries three aggregates in one Nest module: `template/`, `assignment/` (the running onboarding), and `chat/`. The three repository ports are bound to Prisma adapters via `Symbol` tokens (`ONBOARDING_TEMPLATE_REPOSITORY`, `ONBOARDING_REPOSITORY`, `ONBOARDING_CHAT_REPOSITORY`); the three mappers (`OnboardingTemplateMapper`, `OnboardingMapper`, `OnboardingChatMapper`) are `@Injectable()` and registered in `providers`. The module imports only `PrismaModule` (CQRS is global from `AppModule`). Handlers are decorated with `@CommandHandler(...)` and registered in `providers`. Controllers inject `CommandBus` (never the handlers directly). Entities use the unified `protected constructor(CreateEntityProps<...>)` + static `create` / `recreate` style, and throw `DomainException` for invariants (e.g. `ONBOARDING_STEP_OUT_OF_ORDER`, `ONBOARDING_CHAT_SENDER_FORBIDDEN`).
 
 ## Database schema
 

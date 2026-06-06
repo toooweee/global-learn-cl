@@ -63,7 +63,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     this.logger.error(
-      `[${correlationId}] Exception caught: ${message}`,
+      `Exception caught: ${message}`,
       exception instanceof Error ? exception.stack : undefined,
     );
 

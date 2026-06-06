@@ -1,17 +1,29 @@
 import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
+import {
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { SendOnboardingChatMessageCommand } from '@/modules/onboarding/chat/application/send-message/send-message.command';
-import { SendOnboardingChatMessageDto } from '@/modules/onboarding/chat/presentation/dto/send-message.dto';
+import { SendOnboardingChatMessageRequestDto } from '@/modules/onboarding/chat/presentation/dto/send-message.request.dto';
 import { IdResponseDto } from '@/libs/api/dto';
 
+@ApiTags('onboarding-chat')
 @Controller('onboardings/:onboardingId/chat/messages')
 export class OnboardingChatController {
   constructor(private readonly commandBus: CommandBus) {}
 
+  @ApiOperation({ summary: 'Send a message to the onboarding chat' })
+  @ApiCreatedResponse({ type: IdResponseDto })
+  @ApiNotFoundResponse()
+  @ApiForbiddenResponse()
   @Post()
   async sendMessage(
     @Param('onboardingId', ParseUUIDPipe) onboardingId: string,
-    @Body() dto: SendOnboardingChatMessageDto,
+    @Body() body: SendOnboardingChatMessageRequestDto,
   ): Promise<IdResponseDto> {
     return this.commandBus.execute<
       SendOnboardingChatMessageCommand,
@@ -19,8 +31,8 @@ export class OnboardingChatController {
     >(
       new SendOnboardingChatMessageCommand({
         onboardingId,
-        senderId: dto.senderId,
-        body: dto.body,
+        senderId: body.senderId,
+        body: body.body,
       }),
     );
   }

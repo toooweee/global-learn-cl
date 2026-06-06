@@ -14,7 +14,7 @@ import {
 @ValidatorConstraint({ name: 'EndAfterStart', async: false })
 class EndAfterStart implements ValidatorConstraintInterface {
   validate(_: unknown, args: ValidationArguments) {
-    const obj = args.object as AssignOnboardingDto;
+    const obj = args.object as AssignOnboardingRequestDto;
     return obj.endDate instanceof Date && obj.endDate > obj.startDate;
   }
   defaultMessage() {
@@ -22,7 +22,7 @@ class EndAfterStart implements ValidatorConstraintInterface {
   }
 }
 
-export class AssignOnboardingDto {
+export class AssignOnboardingRequestDto {
   @IsUUID()
   templateId!: string;
 

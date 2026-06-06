@@ -1,28 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { None, Option, Some } from 'oxide.ts';
 import { PrismaRepositoryBase } from '@/infra/prisma/prisma.repository.base';
+import { PrismaService } from '@/infra/prisma/prisma.service';
 import { AggregateId } from '@/libs/ddd/entity.base';
 import { OnboardingChatEntity } from '@/modules/onboarding/chat/domain/chat.entity';
 import { OnboardingChatRepositoryPort } from '@/modules/onboarding/chat/application/ports/chat.repository.port';
-
-type PrismaChat = {
-  id: string;
-  onboardingId: string;
-  createdAt: Date;
-  messages: Array<{
-    id: string;
-    senderId: string;
-    body: string;
-    readAt: Date | null;
-    createdAt: Date;
-  }>;
-};
+import {
+  OnboardingChatMapper,
+  onboardingChatInclude,
+} from '@/modules/onboarding/chat/chat.mapper';
 
 @Injectable()
 export class OnboardingChatPrismaRepository
   extends PrismaRepositoryBase
   implements OnboardingChatRepositoryPort
 {
+  constructor(
+    prismaService: PrismaService,
+    private readonly mapper: OnboardingChatMapper,
+  ) {
+    super(prismaService);
+  }
+
   async save(chat: OnboardingChatEntity): Promise<void> {
     const props = chat.getProps();
     const existing = await this.db.onboardingChat.findUnique({
@@ -59,25 +58,8 @@ export class OnboardingChatPrismaRepository
   ): Promise<Option<OnboardingChatEntity>> {
     const row = await this.db.onboardingChat.findUnique({
       where: { onboardingId },
-      include: { messages: { orderBy: { createdAt: 'asc' } } },
+      include: onboardingChatInclude,
     });
-    if (!row) return None;
-    const r = row as PrismaChat;
-    return Some(
-      OnboardingChatEntity.hydrate(
-        {
-          onboardingId: r.onboardingId,
-          createdAt: r.createdAt,
-          messages: r.messages.map((m) => ({
-            id: m.id,
-            senderId: m.senderId,
-            body: m.body,
-            readAt: m.readAt ?? undefined,
-            createdAt: m.createdAt,
-          })),
-        },
-        r.id,
-      ),
-    );
+    return row ? Some(this.mapper.toDomain(row)) : None;
   }
 }

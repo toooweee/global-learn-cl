@@ -1,4 +1,4 @@
-import { Inject, NotFoundException } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { OnboardingEntity } from '@/modules/onboarding/assignment/domain/onboarding.entity';
 import { AssignOnboardingCommand } from '@/modules/onboarding/assignment/application/assign-onboarding/assign-onboarding.command';
@@ -10,6 +10,7 @@ import { ONBOARDING_CHAT_REPOSITORY } from '@/modules/onboarding/chat/applicatio
 import type { OnboardingChatRepositoryPort } from '@/modules/onboarding/chat/application/ports/chat.repository.port';
 import { OnboardingChatEntity } from '@/modules/onboarding/chat/domain/chat.entity';
 import { IdResponseDto } from '@/libs/api/dto';
+import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 
 @CommandHandler(AssignOnboardingCommand)
 export class AssignOnboardingHandler implements ICommandHandler<
@@ -31,7 +32,11 @@ export class AssignOnboardingHandler implements ICommandHandler<
         command.templateId,
       );
       if (template.isNone()) {
-        throw new NotFoundException('Onboarding template not found');
+        throw new ApplicationException(
+          'Onboarding template not found',
+          404,
+          'ONBOARDING_TEMPLATE_NOT_FOUND',
+        );
       }
 
       const onboarding = OnboardingEntity.assignFromTemplate({

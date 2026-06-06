@@ -1,10 +1,11 @@
-import { ConflictException, Inject } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { OnboardingTemplateEntity } from '@/modules/onboarding/template/domain/template.entity';
 import { CreateOnboardingTemplateCommand } from '@/modules/onboarding/template/application/create-template/create-template.command';
 import { ONBOARDING_TEMPLATE_REPOSITORY } from '@/modules/onboarding/template/application/ports/template.repository.port';
 import type { OnboardingTemplateRepositoryPort } from '@/modules/onboarding/template/application/ports/template.repository.port';
 import { IdResponseDto } from '@/libs/api/dto';
+import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 
 @CommandHandler(CreateOnboardingTemplateCommand)
 export class CreateOnboardingTemplateHandler implements ICommandHandler<
@@ -25,8 +26,10 @@ export class CreateOnboardingTemplateHandler implements ICommandHandler<
         command.divisionId,
       );
       if (existing.isSome()) {
-        throw new ConflictException(
+        throw new ApplicationException(
           'Onboarding template for this position and division already exists',
+          409,
+          'ONBOARDING_TEMPLATE_ALREADY_EXISTS',
         );
       }
 

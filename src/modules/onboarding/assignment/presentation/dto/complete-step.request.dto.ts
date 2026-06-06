@@ -12,7 +12,7 @@ import {
 @ValidatorConstraint({ name: 'FeedbackPresent', async: false })
 class FeedbackPresent implements ValidatorConstraintInterface {
   validate(_: unknown, args: ValidationArguments) {
-    const obj = args.object as CompleteOnboardingStepDto;
+    const obj = args.object as CompleteOnboardingStepRequestDto;
     const text = obj.feedbackText?.trim();
     return (obj.selectedOptionIds?.length ?? 0) > 0 || !!(text && text.length);
   }
@@ -21,7 +21,7 @@ class FeedbackPresent implements ValidatorConstraintInterface {
   }
 }
 
-export class CompleteOnboardingStepDto {
+export class CompleteOnboardingStepRequestDto {
   @IsUUID()
   stepId!: string;
 

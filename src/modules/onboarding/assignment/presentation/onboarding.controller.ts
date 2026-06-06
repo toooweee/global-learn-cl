@@ -1,33 +1,49 @@
 import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
+import {
+  ApiCreatedResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AssignOnboardingCommand } from '@/modules/onboarding/assignment/application/assign-onboarding/assign-onboarding.command';
 import { CompleteOnboardingStepCommand } from '@/modules/onboarding/assignment/application/complete-step/complete-step.command';
-import { AssignOnboardingDto } from '@/modules/onboarding/assignment/presentation/dto/assign-onboarding.dto';
-import { CompleteOnboardingStepDto } from '@/modules/onboarding/assignment/presentation/dto/complete-step.dto';
+import { AssignOnboardingRequestDto } from '@/modules/onboarding/assignment/presentation/dto/assign-onboarding.request.dto';
+import { CompleteOnboardingStepRequestDto } from '@/modules/onboarding/assignment/presentation/dto/complete-step.request.dto';
 import { IdResponseDto } from '@/libs/api/dto';
 
+@ApiTags('onboardings')
 @Controller('onboardings')
 export class OnboardingController {
   constructor(private readonly commandBus: CommandBus) {}
 
+  @ApiOperation({ summary: 'Assign an onboarding from a template' })
+  @ApiCreatedResponse({ type: IdResponseDto })
+  @ApiNotFoundResponse()
   @Post()
-  async assign(@Body() dto: AssignOnboardingDto): Promise<IdResponseDto> {
+  async assign(
+    @Body() body: AssignOnboardingRequestDto,
+  ): Promise<IdResponseDto> {
     return this.commandBus.execute<AssignOnboardingCommand, IdResponseDto>(
-      new AssignOnboardingCommand(dto),
+      new AssignOnboardingCommand(body),
     );
   }
 
+  @ApiOperation({ summary: 'Complete the current step of an onboarding' })
+  @ApiOkResponse()
+  @ApiNotFoundResponse()
   @Post(':id/complete-step')
   async completeStep(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: CompleteOnboardingStepDto,
+    @Body() body: CompleteOnboardingStepRequestDto,
   ): Promise<void> {
     await this.commandBus.execute<CompleteOnboardingStepCommand, void>(
       new CompleteOnboardingStepCommand({
         onboardingId: id,
-        stepId: dto.stepId,
-        selectedOptionIds: dto.selectedOptionIds,
-        feedbackText: dto.feedbackText,
+        stepId: body.stepId,
+        selectedOptionIds: body.selectedOptionIds,
+        feedbackText: body.feedbackText,
       }),
     );
   }

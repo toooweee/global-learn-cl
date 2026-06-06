@@ -1,45 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { None, Option, Some } from 'oxide.ts';
-import { OnboardingStatus, OnboardingStepType } from '@generated/client';
 import { PrismaRepositoryBase } from '@/infra/prisma/prisma.repository.base';
+import { PrismaService } from '@/infra/prisma/prisma.service';
 import { AggregateId } from '@/libs/ddd/entity.base';
 import { OnboardingEntity } from '@/modules/onboarding/assignment/domain/onboarding.entity';
 import { OnboardingRepositoryPort } from '@/modules/onboarding/assignment/application/ports/onboarding.repository.port';
-
-type PrismaOnboarding = {
-  id: string;
-  name: string;
-  description: string;
-  templateId: string | null;
-  assignedById: string;
-  assignedToId: string;
-  status: OnboardingStatus;
-  startDate: Date;
-  endDate: Date;
-  completedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date | null;
-  steps: Array<{
-    id: string;
-    position: number;
-    name: string;
-    description: string;
-    type: OnboardingStepType;
-    courseId: string | null;
-    recommendedStartDate: Date;
-    recommendedEndDate: Date;
-    feedbackText: string | null;
-    completedAt: Date | null;
-    feedbackOptions: Array<{ id: string; label: string }>;
-    feedbackSelections: Array<{ optionId: string }>;
-  }>;
-};
+import {
+  OnboardingMapper,
+  onboardingInclude,
+} from '@/modules/onboarding/assignment/onboarding.mapper';
 
 @Injectable()
 export class OnboardingPrismaRepository
   extends PrismaRepositoryBase
   implements OnboardingRepositoryPort
 {
+  constructor(
+    prismaService: PrismaService,
+    private readonly mapper: OnboardingMapper,
+  ) {
+    super(prismaService);
+  }
+
   async save(onboarding: OnboardingEntity): Promise<void> {
     const props = onboarding.getProps();
     const existing = await this.db.onboarding.findUnique({
@@ -129,65 +111,17 @@ export class OnboardingPrismaRepository
   async findById(id: AggregateId): Promise<Option<OnboardingEntity>> {
     const row = await this.db.onboarding.findUnique({
       where: { id },
-      include: this.fullInclude(),
+      include: onboardingInclude,
     });
-    return row ? Some(this.toDomain(row as PrismaOnboarding)) : None;
+    return row ? Some(this.mapper.toDomain(row)) : None;
   }
 
   async findByAssignee(assignedToId: AggregateId): Promise<OnboardingEntity[]> {
     const rows = await this.db.onboarding.findMany({
       where: { assignedToId },
-      include: this.fullInclude(),
+      include: onboardingInclude,
       orderBy: { createdAt: 'desc' },
     });
-    return rows.map((r) => this.toDomain(r as PrismaOnboarding));
-  }
-
-  private fullInclude() {
-    return {
-      steps: {
-        orderBy: { position: 'asc' as const },
-        include: {
-          feedbackOptions: true,
-          feedbackSelections: true,
-        },
-      },
-    };
-  }
-
-  private toDomain(row: PrismaOnboarding): OnboardingEntity {
-    return OnboardingEntity.hydrate(
-      {
-        name: row.name,
-        description: row.description,
-        templateId: row.templateId ?? undefined,
-        assignedById: row.assignedById,
-        assignedToId: row.assignedToId,
-        status: row.status,
-        startDate: row.startDate,
-        endDate: row.endDate,
-        completedAt: row.completedAt ?? undefined,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt ?? undefined,
-        steps: row.steps.map((step) => ({
-          id: step.id,
-          position: step.position,
-          name: step.name,
-          description: step.description,
-          type: step.type,
-          courseId: step.courseId ?? undefined,
-          recommendedStartDate: step.recommendedStartDate,
-          recommendedEndDate: step.recommendedEndDate,
-          feedbackText: step.feedbackText ?? undefined,
-          completedAt: step.completedAt ?? undefined,
-          feedbackOptions: step.feedbackOptions.map((option) => ({
-            id: option.id,
-            label: option.label,
-          })),
-          selectedOptionIds: step.feedbackSelections.map((s) => s.optionId),
-        })),
-      },
-      row.id,
-    );
+    return rows.map((r) => this.mapper.toDomain(r));
   }
 }

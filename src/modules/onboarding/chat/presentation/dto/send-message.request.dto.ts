@@ -1,6 +1,6 @@
 import { IsString, IsUUID, Length } from 'class-validator';
 
-export class SendOnboardingChatMessageDto {
+export class SendOnboardingChatMessageRequestDto {
   @IsUUID()
   senderId!: string;
 

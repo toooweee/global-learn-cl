@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { OnboardingStatus, OnboardingStepType } from '@generated/client';
-import { AggregateId, Entity } from '@/libs/ddd/entity.base';
+import { AggregateId, CreateEntityProps, Entity } from '@/libs/ddd/entity.base';
+import { DomainException } from '@/libs/ddd/domain.exception';
 import {
   OnboardingProps,
   OnboardingStepProps,
@@ -36,16 +37,24 @@ export interface AssignAdHocProps {
   }>;
 }
 
+export interface RecreateOnboardingProps {
+  id: AggregateId;
+  props: OnboardingProps;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export class OnboardingEntity extends Entity<OnboardingProps> {
-  private constructor(props: OnboardingProps, id: AggregateId) {
-    super({ id, props });
+  protected constructor(props: CreateEntityProps<OnboardingProps>) {
+    super(props);
   }
 
   static assignFromTemplate(props: AssignFromTemplateProps): OnboardingEntity {
     if (props.endDate <= props.startDate) {
-      throw new Error('endDate must be after startDate');
+      throw new DomainException(
+        'endDate must be after startDate',
+        'ONBOARDING_INVALID_DATE_RANGE',
+      );
     }
     const tpl = props.template.getProps();
     const steps: OnboardingStepProps[] = tpl.steps.map((step) => ({
@@ -68,8 +77,9 @@ export class OnboardingEntity extends Entity<OnboardingProps> {
       selectedOptionIds: [],
     }));
 
-    return new OnboardingEntity(
-      {
+    return new OnboardingEntity({
+      id: randomUUID(),
+      props: {
         name: props.nameOverride ?? tpl.name,
         description: props.descriptionOverride ?? tpl.description,
         templateId: props.template.id,
@@ -81,13 +91,15 @@ export class OnboardingEntity extends Entity<OnboardingProps> {
         steps,
         createdAt: new Date(),
       },
-      randomUUID(),
-    );
+    });
   }
 
   static assignAdHoc(props: AssignAdHocProps): OnboardingEntity {
     if (props.endDate <= props.startDate) {
-      throw new Error('endDate must be after startDate');
+      throw new DomainException(
+        'endDate must be after startDate',
+        'ONBOARDING_INVALID_DATE_RANGE',
+      );
     }
     const steps: OnboardingStepProps[] = props.steps
       .slice()
@@ -108,8 +120,9 @@ export class OnboardingEntity extends Entity<OnboardingProps> {
         selectedOptionIds: [],
       }));
 
-    return new OnboardingEntity(
-      {
+    return new OnboardingEntity({
+      id: randomUUID(),
+      props: {
         name: props.name,
         description: props.description,
         assignedById: props.assignedById,
@@ -120,12 +133,11 @@ export class OnboardingEntity extends Entity<OnboardingProps> {
         steps,
         createdAt: new Date(),
       },
-      randomUUID(),
-    );
+    });
   }
 
-  static hydrate(props: OnboardingProps, id: AggregateId): OnboardingEntity {
-    return new OnboardingEntity(props, id);
+  static recreate({ id, props }: RecreateOnboardingProps): OnboardingEntity {
+    return new OnboardingEntity({ id, props });
   }
 
   currentStep(): OnboardingStepProps | undefined {
@@ -142,29 +154,45 @@ export class OnboardingEntity extends Entity<OnboardingProps> {
     now?: Date;
   }): void {
     if (this._props.status !== OnboardingStatus.IN_PROGRESS) {
-      throw new Error('Onboarding is not in progress');
+      throw new DomainException(
+        'Onboarding is not in progress',
+        'ONBOARDING_NOT_IN_PROGRESS',
+        409,
+      );
     }
     const current = this.currentStep();
     if (!current) {
-      throw new Error('No remaining steps');
+      throw new DomainException(
+        'No remaining steps',
+        'ONBOARDING_NO_REMAINING_STEPS',
+        409,
+      );
     }
     if (current.id !== input.stepId) {
-      throw new Error('Cannot complete a step out of order');
+      throw new DomainException(
+        'Cannot complete a step out of order',
+        'ONBOARDING_STEP_OUT_OF_ORDER',
+        409,
+      );
     }
 
     const hasFeedback =
       (input.feedbackText && input.feedbackText.trim().length > 0) ||
       input.selectedOptionIds.length > 0;
     if (!hasFeedback) {
-      throw new Error(
+      throw new DomainException(
         'Step feedback is required (select at least one option or provide text)',
+        'ONBOARDING_STEP_FEEDBACK_REQUIRED',
       );
     }
 
     const validIds = new Set(current.feedbackOptions.map((o) => o.id));
     for (const id of input.selectedOptionIds) {
       if (!validIds.has(id)) {
-        throw new Error(`Unknown feedback option ${id}`);
+        throw new DomainException(
+          `Unknown feedback option ${id}`,
+          'ONBOARDING_UNKNOWN_FEEDBACK_OPTION',
+        );
       }
     }
 

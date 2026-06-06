@@ -17,7 +17,7 @@ import {
 } from 'class-validator';
 import { OnboardingStepType } from '@generated/client';
 
-export class CreateOnboardingTemplateStepFeedbackOptionDto {
+export class CreateOnboardingTemplateStepFeedbackOptionRequestDto {
   @IsString()
   @Length(1, 255)
   label!: string;
@@ -26,7 +26,7 @@ export class CreateOnboardingTemplateStepFeedbackOptionDto {
 @ValidatorConstraint({ name: 'CourseIdRequiredForCourseStep', async: false })
 class CourseIdRequiredForCourseStep implements ValidatorConstraintInterface {
   validate(_: unknown, args: ValidationArguments) {
-    const obj = args.object as CreateOnboardingTemplateStepDto;
+    const obj = args.object as CreateOnboardingTemplateStepRequestDto;
     return obj.type !== OnboardingStepType.COURSE || !!obj.courseId;
   }
   defaultMessage() {
@@ -34,7 +34,7 @@ class CourseIdRequiredForCourseStep implements ValidatorConstraintInterface {
   }
 }
 
-export class CreateOnboardingTemplateStepDto {
+export class CreateOnboardingTemplateStepRequestDto {
   @IsInt()
   @Min(1)
   position!: number;
@@ -68,11 +68,11 @@ export class CreateOnboardingTemplateStepDto {
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateOnboardingTemplateStepFeedbackOptionDto)
-  feedbackOptions: CreateOnboardingTemplateStepFeedbackOptionDto[] = [];
+  @Type(() => CreateOnboardingTemplateStepFeedbackOptionRequestDto)
+  feedbackOptions: CreateOnboardingTemplateStepFeedbackOptionRequestDto[] = [];
 }
 
-export class CreateOnboardingTemplateDto {
+export class CreateOnboardingTemplateRequestDto {
   @IsString()
   @Length(1, 255)
   name!: string;
@@ -93,6 +93,6 @@ export class CreateOnboardingTemplateDto {
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => CreateOnboardingTemplateStepDto)
-  steps!: CreateOnboardingTemplateStepDto[];
+  @Type(() => CreateOnboardingTemplateStepRequestDto)
+  steps!: CreateOnboardingTemplateStepRequestDto[];
 }

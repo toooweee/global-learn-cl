@@ -37,15 +37,13 @@ export class ContextInterceptor implements NestInterceptor {
       const { method, url } = request;
       const startTime = Date.now();
 
-      this.logger.log(
-        `[${requestId}] 🚀 [${method}] ${url} - Request Received`,
-      );
+      this.logger.log(`🚀 [${method}] ${url} - Request Received`);
 
       return next.handle().pipe(
         tap(() => {
           const duration = Date.now() - startTime;
           this.logger.log(
-            `[${requestId}] 🔥 [${method}] ${url} | Status: ${response.statusCode} | +${duration}ms`,
+            `🔥 [${method}] ${url} | Status: ${response.statusCode} | +${duration}ms`,
           );
         }),
       );

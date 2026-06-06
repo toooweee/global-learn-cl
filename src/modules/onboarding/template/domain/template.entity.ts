@@ -1,14 +1,20 @@
 import { randomUUID } from 'node:crypto';
-import { AggregateId, Entity } from '@/libs/ddd/entity.base';
+import { AggregateId, CreateEntityProps, Entity } from '@/libs/ddd/entity.base';
+import { DomainException } from '@/libs/ddd/domain.exception';
 import {
   CreateOnboardingTemplateProps,
   OnboardingTemplateProps,
   OnboardingTemplateStepProps,
 } from '@/modules/onboarding/template/template.types';
 
+export interface RecreateOnboardingTemplateProps {
+  id: AggregateId;
+  props: OnboardingTemplateProps;
+}
+
 export class OnboardingTemplateEntity extends Entity<OnboardingTemplateProps> {
-  private constructor(props: OnboardingTemplateProps, id: AggregateId) {
-    super({ id, props });
+  protected constructor(props: CreateEntityProps<OnboardingTemplateProps>) {
+    super(props);
   }
 
   static create(
@@ -19,8 +25,9 @@ export class OnboardingTemplateEntity extends Entity<OnboardingTemplateProps> {
       .sort((a, b) => a.position - b.position)
       .map((step) => {
         if (step.recommendedEndOffsetDays < step.recommendedStartOffsetDays) {
-          throw new Error(
+          throw new DomainException(
             `Template step "${step.name}": end offset must be >= start offset`,
+            'ONBOARDING_TEMPLATE_STEP_INVALID_OFFSETS',
           );
         }
         return {
@@ -40,8 +47,9 @@ export class OnboardingTemplateEntity extends Entity<OnboardingTemplateProps> {
         };
       });
 
-    return new OnboardingTemplateEntity(
-      {
+    return new OnboardingTemplateEntity({
+      id: randomUUID(),
+      props: {
         name: props.name,
         description: props.description,
         positionId: props.positionId,
@@ -50,14 +58,13 @@ export class OnboardingTemplateEntity extends Entity<OnboardingTemplateProps> {
         steps,
         createdAt: new Date(),
       },
-      randomUUID(),
-    );
+    });
   }
 
-  static hydrate(
-    props: OnboardingTemplateProps,
-    id: AggregateId,
-  ): OnboardingTemplateEntity {
-    return new OnboardingTemplateEntity(props, id);
+  static recreate({
+    id,
+    props,
+  }: RecreateOnboardingTemplateProps): OnboardingTemplateEntity {
+    return new OnboardingTemplateEntity({ id, props });
   }
 }

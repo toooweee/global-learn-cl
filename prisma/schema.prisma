@@ -20,11 +20,24 @@ model User {
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   employee      Employee?
-  client        Client?
-  roles         UserRole[]
+  token         Token[]
   notifications Notification[]
+  role          Role           @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  roleId        String         @map("role_id") @db.Uuid
 
   @@map("users")
+}
+
+model Token {
+  id          String   @id @default(uuid()) @db.Uuid
+  hashedToken String
+  userAgent   String   @map("user_agent")
+  expiresAt   DateTime @map("expires_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String   @map("user_id") @db.Uuid
+
+  @@unique([userId, userAgent])
+  @@map("tokens")
 }
 
 model Role {
@@ -33,20 +46,9 @@ model Role {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  users UserRole[]
+  users User[]
 
   @@map("roles")
-}
-
-model UserRole {
-  userId String @map("user_id") @db.Uuid
-  roleId String @map("role_id") @db.Uuid
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@id([userId, roleId])
-  @@map("user_roles")
 }
 
 // ============================================================
@@ -81,8 +83,12 @@ model Division {
 model Position {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @unique @db.VarChar(255)
+  parentId  String?  @map("parent_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  parent       Position?  @relation("PositionHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  subordinates Position[] @relation("PositionHierarchy")
 
   employees           Employee[]
   onboardingTemplates OnboardingTemplate[]
@@ -117,34 +123,6 @@ model Employee {
   @@map("employees")
 }
 
-model ClientCompany {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String   @db.VarChar(255)
-  avatarId  String?  @map("avatar_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
-
-  avatar  File?    @relation("ClientCompanyAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
-  clients Client[]
-
-  @@map("client_companies")
-}
-
-model Client {
-  id        String   @id @db.Uuid
-  fullname  String   @db.VarChar(255)
-  avatarId  String?  @map("avatar_id") @db.Uuid
-  companyId String   @map("company_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
-
-  user    User          @relation(fields: [id], references: [id], onDelete: Cascade)
-  avatar  File?         @relation("ClientAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
-  company ClientCompany @relation(fields: [companyId], references: [id])
-
-  @@map("clients")
-}
-
 // ============================================================
 // Files
 // ============================================================
@@ -155,8 +133,6 @@ model File {
 
   courses                 Course[]                 @relation("CourseCover")
   employeeAvatars         Employee[]               @relation("EmployeeAvatar")
-  clientAvatars           Client[]                 @relation("ClientAvatar")
-  clientCompanyAvatars    ClientCompany[]          @relation("ClientCompanyAvatar")
   onboardingTemplates     OnboardingTemplate[]     @relation("OnboardingTemplateCover")
   onboardingTemplateSteps OnboardingTemplateStep[] @relation("OnboardingTemplateStepCover")
 

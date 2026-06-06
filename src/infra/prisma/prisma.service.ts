@@ -7,7 +7,6 @@ import {
 import { PrismaClient, Prisma } from '@generated/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { EnvService } from '@/infra/env/env.service';
-import { RequestContextService } from '@/libs/application/context';
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
@@ -36,9 +35,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     };
 
     prismaEventEmitter.$on('query', (e: Prisma.QueryEvent) => {
-      const cid = RequestContextService.getRequestId();
       this.logger.log(
-        `[${cid}] 💾 SQL: ${e.query} | Params: ${e.params} | Duration: ${e.duration}ms`,
+        `💾 SQL: ${e.query} | Params: ${e.params} | Duration: ${e.duration}ms`,
       );
     });
   }
