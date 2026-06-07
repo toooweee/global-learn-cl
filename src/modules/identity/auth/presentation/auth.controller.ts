@@ -30,9 +30,7 @@ import { ChangePasswordCommand } from '@/modules/identity/auth/application/chang
 import { LogoutCommand } from '@/modules/identity/auth/application/logout/logout.command';
 import { RefreshTokenCommand } from '@/modules/identity/auth/application/refresh-tokens/refresh-token.command';
 import type { TokenIssuance } from '@/modules/identity/token/token.service';
-
-const ACCESS_TOKEN_COOKIE = 'access_token';
-const REFRESH_TOKEN_COOKIE = 'refresh_token';
+import { cookieConstants } from '@/libs/api/decorators/cookie.constants';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -90,14 +88,16 @@ export class AuthController {
       new LoginCommand({ ...body, userAgent }),
     );
 
+    console.log(issuance);
+
     const cookies = cookieFactory(req, res);
     cookies.set(
-      ACCESS_TOKEN_COOKIE,
+      cookieConstants.ACCESS_TOKEN,
       issuance.accessToken,
       issuance.accessTokenMaxAge,
     );
     cookies.set(
-      REFRESH_TOKEN_COOKIE,
+      cookieConstants.REFRESH_TOKEN,
       issuance.refreshTokenCookie,
       issuance.refreshTokenMaxAge,
     );
@@ -111,7 +111,7 @@ export class AuthController {
   @Public()
   @Post('refresh')
   async refreshTokens(
-    @Cookies(REFRESH_TOKEN_COOKIE) refreshTokenCookie: string,
+    @Cookies(cookieConstants.REFRESH_TOKEN) refreshTokenCookie: string,
     @UserAgent() userAgent: string,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -123,12 +123,12 @@ export class AuthController {
 
     const cookies = cookieFactory(req, res);
     cookies.set(
-      ACCESS_TOKEN_COOKIE,
+      cookieConstants.ACCESS_TOKEN,
       issuance.accessToken,
       issuance.accessTokenMaxAge,
     );
     cookies.set(
-      REFRESH_TOKEN_COOKIE,
+      cookieConstants.REFRESH_TOKEN,
       issuance.refreshTokenCookie,
       issuance.refreshTokenMaxAge,
     );
@@ -152,8 +152,8 @@ export class AuthController {
     );
 
     const cookies = cookieFactory(req, res);
-    cookies.remove(ACCESS_TOKEN_COOKIE);
-    cookies.remove(REFRESH_TOKEN_COOKIE);
+    cookies.remove(cookieConstants.ACCESS_TOKEN);
+    cookies.remove(cookieConstants.REFRESH_TOKEN);
   }
 
   @ApiOperation({ summary: 'Change password (invalidates all sessions)' })
@@ -174,7 +174,7 @@ export class AuthController {
     );
 
     const cookies = cookieFactory(req, res);
-    cookies.remove(ACCESS_TOKEN_COOKIE);
-    cookies.remove(REFRESH_TOKEN_COOKIE);
+    cookies.remove(cookieConstants.ACCESS_TOKEN);
+    cookies.remove(cookieConstants.REFRESH_TOKEN);
   }
 }

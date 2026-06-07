@@ -5,6 +5,9 @@ import { IS_PUBLIC_KEY } from '@/libs/auth/decorators/public.decorator';
 import { RequestContextService } from '@/libs/application/context/app-request-context';
 import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 import type { JwtPayload } from '@/modules/identity/token/token.service';
+import { type Request, type Response } from 'express';
+import { cookieFactory } from '@/libs/api/cookie/cookie-factory';
+import { cookieConstants } from '@/libs/api/decorators/cookie.constants';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -20,10 +23,14 @@ export class JwtAuthGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const request = context
-      .switchToHttp()
-      .getRequest<{ cookies?: Record<string, string> }>();
-    const token = request.cookies?.['access_token'];
+    const req = context.switchToHttp().getRequest<Request>();
+    const res = context.switchToHttp().getResponse<Response>();
+
+    const cookies = cookieFactory(req, res);
+
+    const token = cookies.get(cookieConstants.ACCESS_TOKEN);
+
+    console.log(token);
 
     if (!token) {
       throw new ApplicationException('No token provided', 401, 'UNAUTHORIZED');

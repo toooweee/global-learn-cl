@@ -19,6 +19,7 @@ const repositories: Provider[] = [
     EnvModule,
     CryptoModule,
     JwtModule.registerAsync({
+      global: true,
       imports: [EnvModule],
       useFactory: (envService: EnvService) => ({
         secret: envService.get('JWT_ACCESS_SECRET'),

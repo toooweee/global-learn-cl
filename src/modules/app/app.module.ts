@@ -12,7 +12,6 @@ import { OrganizationModule } from '@/modules/organization/organization.module';
 import { EmployeeModule } from '@/modules/employee/employee.module';
 import { RoleModule } from '@/modules/identity/role/role.module';
 import { CqrsModule } from '@nestjs/cqrs';
-import { JwtModule } from '@nestjs/jwt';
 import { AllExceptionsFilter } from '@/infra/exception-filters/all-exceptions.filter';
 import { JwtAuthGuard } from '@/libs/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/libs/auth/guards/roles.guard';
@@ -36,7 +35,6 @@ const guards: Provider[] = [
     RequestContextModule,
     EnvModule,
     PrismaModule,
-    JwtModule.register({}),
     UserModule,
     AuthModule,
     RoleModule,
