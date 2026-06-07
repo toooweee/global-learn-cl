@@ -12,11 +12,13 @@ export class UserMapper implements Mapper<UserEntity, User, UserResponseDto> {
       props: {
         email: user.email,
         hashedPassword: user.hashedPassword,
+        roleId: user.roleId,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
     });
   }
+
   toPersistence(user: UserEntity): User {
     const props = user.getProps();
 
@@ -24,16 +26,19 @@ export class UserMapper implements Mapper<UserEntity, User, UserResponseDto> {
       id: props.id,
       email: props.email,
       hashedPassword: props.hashedPassword,
+      roleId: props.roleId,
       createdAt: props.createdAt,
       updatedAt: props.updatedAt,
     };
   }
+
   toResponse(user: UserEntity): UserResponseDto {
     const props = user.getProps();
 
     return new UserResponseDto({
       id: props.id,
       email: props.email,
+      roleId: props.roleId,
       createdAt: props.createdAt,
       updatedAt: props.updatedAt,
     });

@@ -3,6 +3,8 @@ import { RequestContext } from 'nestjs-request-context';
 
 export class AppRequestContext {
   requestId: string;
+  userId?: string;
+  userRole?: string;
   prismaTransaction?: PrismaTransactionClient;
 }
 
@@ -19,6 +21,26 @@ export class RequestContextService {
   static getRequestId() {
     const ctx = this.getContext();
     return ctx?.requestId || 'unknown-request';
+  }
+
+  static setUserId(userId: string) {
+    const ctx = this.getContext();
+    if (ctx) ctx.userId = userId;
+  }
+
+  static getUserId(): string | undefined {
+    const ctx = this.getContext();
+    return ctx?.userId;
+  }
+
+  static setUserRole(role: string) {
+    const ctx = this.getContext();
+    if (ctx) ctx.userRole = role;
+  }
+
+  static getUserRole(): string | undefined {
+    const ctx = this.getContext();
+    return ctx?.userRole;
   }
 
   static setTransactionConnection(transaction: PrismaTransactionClient) {

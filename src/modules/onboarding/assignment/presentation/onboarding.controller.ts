@@ -12,6 +12,8 @@ import { CompleteOnboardingStepCommand } from '@/modules/onboarding/assignment/a
 import { AssignOnboardingRequestDto } from '@/modules/onboarding/assignment/presentation/dto/assign-onboarding.request.dto';
 import { CompleteOnboardingStepRequestDto } from '@/modules/onboarding/assignment/presentation/dto/complete-step.request.dto';
 import { IdResponseDto } from '@/libs/api/dto';
+import { CurrentUser } from '@/libs/auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '@/libs/auth/decorators/current-user.decorator';
 
 @ApiTags('onboardings')
 @Controller('onboardings')
@@ -24,9 +26,10 @@ export class OnboardingController {
   @Post()
   async assign(
     @Body() body: AssignOnboardingRequestDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<IdResponseDto> {
     return this.commandBus.execute<AssignOnboardingCommand, IdResponseDto>(
-      new AssignOnboardingCommand(body),
+      new AssignOnboardingCommand({ ...body, assignedById: user.userId }),
     );
   }
 

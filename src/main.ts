@@ -4,9 +4,11 @@ import { AppModule } from '@/modules/app/app.module';
 import { EnvService } from '@/infra/env/env.service';
 import { setupSwagger } from '@/infra/configs/swagger.config';
 import { AppLogger } from '@/infra/logger/app.logger';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.use(cookieParser());
   app.useLogger(new AppLogger());
 
   app.useGlobalPipes(

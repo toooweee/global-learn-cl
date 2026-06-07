@@ -10,6 +10,8 @@ import {
 import { SendOnboardingChatMessageCommand } from '@/modules/onboarding/chat/application/send-message/send-message.command';
 import { SendOnboardingChatMessageRequestDto } from '@/modules/onboarding/chat/presentation/dto/send-message.request.dto';
 import { IdResponseDto } from '@/libs/api/dto';
+import { CurrentUser } from '@/libs/auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '@/libs/auth/decorators/current-user.decorator';
 
 @ApiTags('onboarding-chat')
 @Controller('onboardings/:onboardingId/chat/messages')
@@ -24,6 +26,7 @@ export class OnboardingChatController {
   async sendMessage(
     @Param('onboardingId', ParseUUIDPipe) onboardingId: string,
     @Body() body: SendOnboardingChatMessageRequestDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<IdResponseDto> {
     return this.commandBus.execute<
       SendOnboardingChatMessageCommand,
@@ -31,7 +34,7 @@ export class OnboardingChatController {
     >(
       new SendOnboardingChatMessageCommand({
         onboardingId,
-        senderId: body.senderId,
+        senderId: user.userId,
         body: body.body,
       }),
     );

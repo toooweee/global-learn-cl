@@ -27,9 +27,6 @@ export class AssignOnboardingRequestDto {
   templateId!: string;
 
   @IsUUID()
-  assignedById!: string;
-
-  @IsUUID()
   assignedToId!: string;
 
   @IsDate()

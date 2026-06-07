@@ -3,29 +3,23 @@
 Это план «как достроить приложение». Написан в первую очередь для будущих сессий Claude, поэтому
 пишу плотно, со ссылками на конкретные файлы, и фиксирую решения, которые ещё надо принять.
 
-Состояние на 2026-06-07:
+Состояние на 2026-06-07 (обновлено после Phase 1):
 - БД полностью описана (см. `prisma/schema.prisma`). ⚠ Секция «Database schema» в `CLAUDE.md` устарела (там ещё описаны `clients` / `client_companies` / `user_roles` join + плоский `Position` без иерархии) — поправить при первой удобной правке. Актуальные ключевые отличия от того, что в `CLAUDE.md`:
   - **`Client` / `ClientCompany` удалены** — система чисто B2E (employees only). `Course.author`, enrollment, test attempts, onboarding, chat — всё привязано только к `Employee`.
-  - **`Role` теперь many-to-one с `User`** (`User.roleId` FK, `onDelete: Restrict`). Никакой join-таблицы `user_roles` нет. Роли — что-то типа `Admin`, `Employee` (пока 2 значения, см. Phase 1.5).
+  - **`Role` теперь many-to-one с `User`** (`User.roleId` FK, `onDelete: Restrict`). Никакой join-таблицы `user_roles` нет. Роли — `Admin`, `Employee` (сидятся через `pnpm prisma db seed`).
   - **`Position` иерархична**: self-reference `parent_id` / `subordinates[]` через relation `PositionHierarchy` (`onDelete: SetNull`). Цепочка вверх описывает «руководитель этого сотрудника». Используется для read-side онбординга (Phase 5.2) и любых будущих «мои подчинённые»-вьюх.
-  - **Модель `Token` уже есть в схеме**: `id`, `hashedToken`, `userAgent`, `expiresAt`, `userId` (FK Cascade), `@@unique([userId, userAgent])`. Это и есть упрощённая ротация (один refresh-токен на пользователя на устройство по `userAgent`) — Phase 1.2 не нужно ничего менять в БД, только реализовать `TokenService`.
-- Wired-up модули: `EnvModule`, `PrismaModule`, `RequestContextModule`, `UserModule` (CRUD: `create` + `findById` + `findUsers` через CQRS; `delete-user.command.ts` пустой), `OnboardingModule` (template / assignment / chat — приведён к стилю `UserModule`: `protected` ctor + `create`/`recreate` factories, `DomainException`/`ApplicationException`, выделенные `*Mapper` классы, без локального импорта `CqrsModule`). Оба модуля сейчас — эталон для новых фич. `CqrsModule.forRoot()` зарегистрирован глобально в `AppModule` — новые feature-модули его НЕ импортируют.
-- Куча скелетов под use cases в `src/modules/{employee,education/*,identity/auth,identity/token}` — папки и пустые `.ts` файлы. Не выкидывать без причины: они отражают замысел. На сегодня:
-  - `employee/`: скелеты `create-employee`, `update-employee`, `delete-employee` — пустые;
-  - `education/course/`: скелеты `create-course`, `update-course` + пустой контроллер;
-  - `education/module/`: скелеты `create-module`, `delete-module`;
-  - `education/course-application/`: скелет `create-course-application` + пустой контроллер;
-  - `education/enrollment/`: скелет `create-enrollment`;
-  - `identity/auth/`: скелеты `login`, `complete-registration`, `change-password`, `logout`, `refresh-tokens` (последний — только `.command.ts`, handler-файла нет);
-  - `identity/token/`: пустой `token.module.ts`.
-  Все они должны переехать на `@nestjs/cqrs` `CommandBus` (см. эталон в `src/modules/onboarding/**/application/**.command-handler.ts` и `src/modules/identity/user/application/commands/create-user/`).
-- Валидация HTTP-запросов: **`class-validator` + `class-transformer`** (request DTO в `presentation/dto/*.request.dto.ts`). Ответы — классы из **`src/libs/api/dto/`** (`IdResponseDto` / `BaseResponseDto` / `PaginatedResponseDto<T>`) с **явным конструктором** — НЕ `@Exclude`/`@Expose` (на провод попадает только то, что выставлено в конструкторе). Шаред request-DTO: `IdRequestDto`, `PaginatedQueryRequestDto`. Декоратор `@ApiPaginatedResponse(Model)` лежит в `src/libs/api/decorators/`. `zod` оставлен только для `EnvSchema`.
-- Per-aggregate `<Aggregate>Mapper` обязателен (см. `UserMapper`, реализует `Mapper<Entity, DbRecord, ResponseDto>` из `libs/ddd/mapper.interface.ts`). Регистрируется в `providers` модуля и инжектится в Prisma-репозиторий.
-- Глобальный exception-pipeline уже в строю: `DomainException` (`libs/ddd/`) + `ApplicationException` (`libs/application/exceptions/`) + `AllExceptionsFilter` (зарегистрирован как `APP_FILTER` в `AppModule`). Формат тела ответа — `{ statusCode, code, message, timestamp, path, correlationId }`. ⚠ Конструктор `ApplicationException(message, statusCode, code)` — легко перепутать порядок.
-- Запросы трассируются через `RequestContextService.getRequestId()`: `ContextInterceptor` ставит `requestId` из `x-request-id`/`body.requestId`/`nanoid(6)`, `PrismaService` логирует каждый SQL c этим же префиксом, базовые классы `Command`/`Query` кладут его в `metadata.correlationId`. `AppRequestContext` сейчас несёт **только** `requestId` + `prismaTransaction` (поле `userId` для команд — TODO Phase 0).
-- Read-side паттерн (важно для копипасты): `FindUserQueryHandler` / `FindUsersQueryHandler` инжектят `PrismaService` напрямую и возвращают сырые Prisma-записи (`User` / `Paginated<User>`) — контроллер заворачивает в response DTO. Для простых выборок предпочитать этот путь, репозиторий — для команд и транзакций.
-- `argon2` уже в deps и используется в `CreateUserCommandHandler` (inline, без отдельного `PasswordService` — см. Phase 1.1).
-- Swagger включён (см. `setupSwagger` в `src/infra/configs/swagger.config.ts`), смонтирован на `/api/docs`. Используем чистый `@nestjs/swagger` (без `nestjs-zod`-адаптера — DTO уже на class-validator).
+  - **Модель `Token`**: `id`, `hashedToken`, `userAgent`, `expiresAt`, `userId` (FK Cascade), `@@unique([userId, userAgent])`. Полностью реализована в `TokenModule`.
+- Wired-up модули: `EnvModule`, `PrismaModule`, `RequestContextModule`, `UserModule`, `OnboardingModule`, **`AuthModule`** (Phase 1), **`TokenModule`** (Phase 1). `CqrsModule.forRoot()` зарегистрирован глобально в `AppModule` — новые feature-модули его НЕ импортируют.
+- **Phase 0 и Phase 1 полностью закрыты.** Auth-слой активен: `JwtAuthGuard` + `RolesGuard` зарегистрированы глобально как `APP_GUARD`. Все эндпоинты защищены по умолчанию; открытые помечаются `@Public()`.
+- Скелеты в `src/modules/{employee,education/*}` — всё ещё пустые. `identity/auth/` и `identity/token/` — заполнены.
+- **`AppRequestContext`** несёт `requestId` + `prismaTransaction` + `userId` + `userRole`. `Command.metadata.userId` автоматически берётся из `RequestContextService.getUserId()`.
+- **`PasswordService`** в `src/libs/crypto/` (argon2 wrapper). **`CryptoModule`** экспортирует его — импортировать в модули, где нужен хеш пароля.
+- **`TokenService`** (`src/modules/identity/token/token.service.ts`): `issueTokenPair(userId, role, userAgent)` → `{ accessToken, refreshToken }`, `verifyAndRotateRefreshToken(...)`. Access = JWT (secret `JWT_ACCESS_SECRET`, TTL `JWT_ACCESS_TTL`). Refresh = 32-byte hex opaque, argon2-хеш в БД, TTL `JWT_REFRESH_TTL`.
+- **`Employee.id === User.id`** (shared PK) — `userId` из JWT-токена = `employeeId` везде. `@CurrentUser()` возвращает `{ userId, role }` из `AppRequestContext`.
+- `UserEntity` / `UserMapper` / `UserPrismaRepository` обновлены: добавлен `roleId`, репозиторий использует `this.db` (transaction-aware). `DeleteUserCommandHandler` реализован.
+- `assignedById` / `senderId` убраны из тела запросов онбординга — берутся из `@CurrentUser()`.
+- Read-side паттерн (важно для копипасты): query handlers инжектят `PrismaService` напрямую. Для команд и транзакций — репозиторий.
+- Swagger включён на `/api/docs`. Добавить `@ApiBearerAuth()` на защищённые контроллеры — пока не сделано, но `persistAuthorization: true` позволяет вставить токен вручную.
 - Redis объявлен в `.env` / `EnvSchema`, но не используется. MailHog поднят, но мейлера нет.
 
 > Перед каждой большой фазой проверять: `pnpm lint && pnpm build && pnpm test`. Прогон `pnpm prisma generate` нужен после любых изменений `schema.prisma`. Node берём из `.nvmrc` (24.15.0) — Node 18 ломает Prisma 7 CLI (см. ошибку `ERR_REQUIRE_ESM` в zeptomatch).
@@ -41,7 +35,7 @@
 - [x] **Swagger** — поднят через `setupSwagger(app)` (`src/infra/configs/swagger.config.ts`), смонтирован на **`/api/docs`** (не `/docs`) с `persistAuthorization: true`. Используем чистый `@nestjs/swagger` — `nestjs-zod`-адаптер НЕ нужен, потому что DTO переехали на class-validator.
 - [x] **Логгер с correlationId** — реализован `AppLogger` (`src/infra/logger/app.logger.ts`) extends `ConsoleLogger`: автоматически префиксует строковые сообщения `[<requestId>]`, читая его из `RequestContextService.getRequestId()` (если контекста нет — без префикса). Подключён через `app.useLogger(new AppLogger())` в `main.ts` с `bufferLogs: true`. Ручные `[${requestId}]`-вставки удалены из `ContextInterceptor`, `PrismaService`, `AllExceptionsFilter` — теперь префикс ставит сам логгер. Pino пока НЕ заводим.
 - [x] **Расширить `EnvSchema`** — добавлено: `JWT_ACCESS_SECRET` (min 16), `JWT_REFRESH_SECRET` (min 16), `JWT_ACCESS_TTL` (default `'15m'`), `JWT_REFRESH_TTL` (default `'30d'`), `SMTP_HOST` (default `'localhost'`), `SMTP_PORT` (default `1025`). `FILES_*` пока пропустил — Phase 3 ещё не решена (MinIO vs локальный диск). `.env.example` обновлён.
-- [ ] **`AppRequestContext.userId`** — НЕ сделано. Сейчас контекст несёт только `requestId` + `prismaTransaction`. Добавить поле, заполнять в `JwtAuthGuard` (фаза 1.4). В `command.base.ts` добавить fallback `props?.metadata?.userId ?? RequestContextService.getUserId()`, чтобы каждая команда автоматически знала актора.
+- [x] **`AppRequestContext.userId`** — `AppRequestContext` расширен полями `userId?: string` и `userRole?: string`. `RequestContextService` получил `setUserId`/`getUserId`/`setUserRole`/`getUserRole`. `JwtAuthGuard` заполняет оба поля после верификации токена. `command.base.ts` автоматически подхватывает `userId` из контекста (`props?.metadata?.userId ?? RequestContextService.getUserId()`).
 
 ---
 
@@ -52,70 +46,71 @@
 ### 1.1 Хеширование паролей
 
 - [x] **`argon2` добавлен** и используется inline в `CreateUserCommandHandler` (`argon.hash(password)`).
-- [] Выделить `src/libs/crypto/password.service.ts` — `hash(plain)` / `verify(hash, plain)` — и переключить `CreateUserCommandHandler` на него. Иначе при добавлении `LoginCommandHandler` придётся дублировать import-ы `argon2`. Положить либо в отдельный `CryptoModule`, либо внутрь `AuthModule`.
+- [x] Выделен `src/libs/crypto/password.service.ts` — `hash(plain)` / `verify(hash, plain)` — `CreateUserCommandHandler` переключён на него. `CryptoModule` (`src/libs/crypto/crypto.module.ts`) экспортирует `PasswordService`. Импортируется в `UserModule` и `AuthModule`.
 
 ### 1.2 Token module (`src/modules/identity/token/`)
 
 Папка уже есть, пустая. Цель — простая refresh-token ротация (внутренняя корпоративная система, цепочка с `revokedAt`/`replacedById`/IP-трекингом избыточна).
 
 - [x] Модель `Token` в `schema.prisma`: `id`, `hashedToken`, `userAgent`, `expiresAt`, `userId` (FK Cascade), `@@unique([userId, userAgent])`. Один активный refresh-токен на пользователя на устройство (ключ устройства = `userAgent`).
-- [ ] `TokenEntity` + `Mapper` + `TokenRepositoryPort` / `TokenPrismaRepository` (по образцу `UserModule`). `Mapper` имплементит полный `Mapper<TokenEntity, Token, void>` — `toResponse` не нужен (токены наружу как DTO не отдаём, они идут в куки/JSON непосредственно из handler), либо implements только `ToDomain` + `ToPersistence`.
-- [ ] `TokenService` — выпуск access (JWT, TTL = `JWT_ACCESS_TTL`) и refresh (opaque random, TTL = `JWT_REFRESH_TTL`, хеш в БД через `argon2`). Секреты — `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` из `EnvService`. Подключить `@nestjs/jwt` (его в deps ещё нет).
-- [ ] Стратегия ротации: при `login` / `refresh` — `upsert` по `(userId, userAgent)` (затирает `hashedToken` + `expiresAt`). При `logout` — `delete` по тому же ключу. Опционально `logout-all` — `deleteMany` по `userId`.
-- [ ] **Решение**: в JWT access кладём `userId` + `role` (одна строка — `Role` теперь 1:N). Этого хватит `RolesGuard`-у, не лезем в БД на каждый запрос.
+- [x] `TokenEntity` + `TokenMapper` + `TokenRepositoryPort` / `TokenPrismaRepository` реализованы. `TokenMapper` имплементирует только `ToDomain` + `ToPersistence` (без `toResponse` — токены наружу как DTO не отдаём).
+- [x] `TokenService` (`src/modules/identity/token/token.service.ts`) — `issueTokenPair` / `verifyAccessToken` / `verifyAndRotateRefreshToken`. Access = JWT подписанный `JWT_ACCESS_SECRET` с TTL `JWT_ACCESS_TTL`. Refresh = 32-byte hex opaque, argon2-хеш в `tokens`, TTL `JWT_REFRESH_TTL` парсится в `expiresAt`. `@nestjs/jwt` добавлен в зависимости.
+- [x] Стратегия ротации: `upsert` по `(userId, userAgent)` при login/refresh, `deleteMany` при logout/change-password. `TokenModule` экспортирует `TokenService`, `JwtModule`, `TOKEN_REPOSITORY`.
+- [x] **Решение принято и реализовано**: в JWT access кладём `sub: userId` + `role: role.name`. `RolesGuard` сравнивает `.includes(role)` без обращения к БД.
 
 ### 1.3 Auth module (`src/modules/identity/auth/`)
 
 Скелеты есть — заполнить:
 
-- [ ] `register.command(-handler).ts` — *новый*, не было даже скелета. Создаёт `User` (с обязательным `roleId`) + `Employee` атомарно через `repo.transaction()`. Системы клиентов больше нет — всегда `Employee`. Для админа: HR (роль `Admin`) создаёт пользователя; для обычного флоу — см. `complete-registration` ниже.
-- [ ] `complete-registration.*` — для приглашённых сотрудников: админ создаёт `User`+`Employee` без пароля и шлёт инвайт-токен; пользователь приходит, выставляет пароль.
-- [ ] `login.*` — сверить пароль, выпустить access+refresh, `upsert` `Token` по `(userId, userAgent)`.
-- [ ] `refresh-tokens` — заполнить `refresh-token.command-handler.ts` (handler-файла нет, только `.command.ts`). Сверить хеш приходящего refresh с БД → выдать новую пару, обновить `hashedToken` upsert-ом.
-- [ ] `logout.*` — удалить access токен из куков, удалить refresh token из куков и `delete` строку `tokens` по `(userId, userAgent)`.
-- [ ] `change-password.*` — старый пароль + новый, выпустить новую пару токенов, `deleteMany` `tokens` по `userId` (вылогинить со всех устройств).
+- [x] `register.command(-handler).ts` — создаёт `User` (с `roleId`) + `Employee` атомарно через `prismaService.client.$transaction()`. Защищён `@Roles('Admin')`. `POST /auth/register`. ⚠ Tech-debt: создание Employee bypasses `EmployeeEntity` (его ещё нет) — рефакторинг в Phase 2.2.
+- [x] `complete-registration.*` — `@Public()`, принимает `email + newPassword`, обновляет `hashedPassword`. Invite-token механизм (Phase 6) не реализован.
+- [x] `login.*` — сверяет пароль через `PasswordService.verify`, выпускает пару через `TokenService.issueTokenPair`. `POST /auth/login`.
+- [x] `refresh-tokens` — `refresh-token.command-handler.ts` создан. Загружает `role` через `include: { role: true }`, делегирует `TokenService.verifyAndRotateRefreshToken`. `POST /auth/refresh`.
+- [x] `logout.*` — `TokenService.deleteByUserAndAgent`. `POST /auth/logout`.
+- [x] `change-password.*` — проверяет старый пароль, обновляет хеш, удаляет все токены пользователя. `POST /auth/change-password`.
 
 ### 1.4 Guards / Decorators
 
-- [ ] `JwtAuthGuard` — парсит `Authorization: Bearer ...`, верифицирует, кладёт `userId` + `role` в `AppRequestContext`. Регистрировать как `APP_GUARD` глобально + `@Public()` декоратор для исключений (auth-эндпоинты).
-- [ ] `RolesGuard` + `@Roles('Admin')` — `Role` теперь many-to-one с `User` (одна роль на юзера), поэтому декоратор принимает **список разрешённых ролей**, а сравниваем с одной строкой `role` из JWT (`.includes`). **В access-токен кладём `role.name`** — не лезем в БД на каждый запрос; инвалидация — через короткий access-TTL.
-- [ ] `@CurrentUser()` param-декоратор — достаёт `{ userId, role }` из `AppRequestContext`.
+- [x] `JwtAuthGuard` (`src/libs/auth/guards/jwt-auth.guard.ts`) — парсит `Authorization: Bearer ...`, верифицирует JWT, кладёт `userId` + `role` в `AppRequestContext`. Зарегистрирован как `APP_GUARD` глобально в `AppModule`.
+- [x] `@Public()` (`src/libs/auth/decorators/public.decorator.ts`) — метаданные `IS_PUBLIC_KEY`, `JwtAuthGuard` пропускает такие эндпоинты.
+- [x] `RolesGuard` (`src/libs/auth/guards/roles.guard.ts`) + `@Roles(...roles)` (`src/libs/auth/decorators/roles.decorator.ts`) — глобальный `APP_GUARD`, сравнивает `role` из контекста через `.includes()`.
+- [x] `@CurrentUser()` (`src/libs/auth/decorators/current-user.decorator.ts`) — param-декоратор, возвращает `{ userId: string, role: string }` из `AppRequestContext`.
 
 ### 1.5 Seed ролей
 
-- [ ] `prisma/seed.ts` — пока двух ролей хватит: `Admin`, `Employee`. Регистрировать `prisma.config.ts` → `seed`. (Сейчас seed-скрипта нет.) Без `HR`/`Manager` — «руководитель» определяется через `Position.parent` цепочку (см. Phase 2.1), а не через отдельную роль.
+- [x] `prisma/seed.ts` создан — `upsert` ролей `Admin` и `Employee`. Зарегистрирован в `package.json` `"prisma": { "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts" }`. Запуск: `pnpm prisma db seed`. (`prisma.config.ts` не поддерживает `seed` в Prisma 7 — используется `package.json`.)
 
 ### 1.6 Пост-условие
 
-- [ ] В контроллерах онбординга убрать `assignedById` / `senderId` из body — брать из `@CurrentUser()`.
+- [x] В контроллерах онбординга убраны `assignedById` / `senderId` из body — берутся из `@CurrentUser()`. `AssignOnboardingRequestDto` больше не содержит `assignedById`; `SendOnboardingChatMessageRequestDto` — `senderId`.
 
 ---
 
-## Phase 2 — Organization & People (depends on Phase 1)
-
-Каркас в `src/modules/employee/` есть, но пустой. Нужны ещё модули для словарей.
+## Phase 2 — Organization & People (depends on Phase 1) ✅
 
 ### 2.1 Department / Division / Position
 
-- [ ] `src/modules/organization/department/` — entity (по образцу `OnboardingTemplateEntity`), репозиторий, CRUD use cases, контроллер. Защитить ролью `Admin`.
-- [ ] `src/modules/organization/division/` — то же, FK на `department`.
-- [ ] `src/modules/organization/position/` — **с self-reference иерархией** (`parentId?` → `Position`). Use cases: `create-position { name, parentId? }`, `update-position`, `delete-position` (FK SET NULL, подчинённые «отвязываются» — проверить, что это ОК с точки зрения бизнеса; альтернатива — переподвесить всех `subordinates` на `parent` удаляемого). Read-side: `GetPositionTree` (вся иерархия с детьми), `GetPositionSubordinates(id)` — рекурсивная выборка через Postgres `WITH RECURSIVE` или несколько уровней include-ов (Prisma не умеет рекурсию, придётся `$queryRaw`).
+- [x] `src/modules/organization/department/` — entity, репозиторий, CRUD use cases (`create`, `update`, `delete`, `find`, `find-all`), контроллер. `Admin`-only на write.
+- [x] `src/modules/organization/division/` — то же, FK на `department`. `FindDivisionsQuery` поддерживает `?departmentId` фильтр.
+- [x] `src/modules/organization/position/` — self-reference иерархия (`parentId?`). Use cases: `create`, `update`, `delete`, `find`, `find-all`. Read-side: `GetPositionTreeQuery` (3-уровневый nested include → `PositionTreeDto[]`). `GET /positions/tree` зарегистрирован ДО `GET /positions/:id`.
+- [x] `src/modules/organization/organization.module.ts` — единый модуль, экспортирует `DIVISION_REPOSITORY` и `POSITION_REPOSITORY`. Подключён в `AppModule`.
 
 ### 2.2 Employee (`src/modules/employee/`)
 
-Скелеты есть:
+- [x] `domain/employee.entity.ts` — `Props`: `fullname`, `biography?`, `employmentDate`, `dismissalDate?`, `divisionId`, `positionId?`, `avatarId?`. `create(props)` принимает внешний `id` (shared PK с `User`). Методы: `dismiss()` (выставляет `dismissalDate`), `promote(positionId)`.
+- [x] Use cases: `create-employee` (создаёт `User`+`Employee` атомарно через `repo.transaction`), `update-employee`, `delete-employee` (soft delete — `dismiss()`), `promote-employee`.
+- [x] Read-side: `find-employee`, `find-employees` (paginated), `find-my-subordinates` (employees, чей `position.parentId` = текущий `positionId`).
+- [x] `EmployeeModule` — импортирует `PrismaModule`, `CryptoModule`, `UserModule`; экспортирует `EMPLOYEE_REPOSITORY`. Подключён в `AppModule`.
 
-- [ ] `domain/employee.entity.ts` — собрать по образцу `OnboardingTemplateEntity`. `Props`: `fullname`, `biography?`, `employmentDate`, `dismissalDate?`, `divisionId`, `positionId?`, `avatarId?`.
-- [ ] Use cases: `create-employee` (создаёт `User`+`Employee` атомарно через `repo.transaction`), `update-employee`, `delete-employee`. Решение: **`delete` = выставление `dismissalDate`**, не удалять данные.
-- [ ] Дополнительно: `promote-employee` (смена `positionId`) — это может триггерить новое назначение онбординга (фаза 5).
-- [ ] Read-side: `GetMySubordinates` (employee'ы, чей `position.parentId` = моя `positionId`; рекурсивно или нет — см. Open Questions). Используется в read-side онбординга для «руководитель видит подчинённых» (Phase 5.2).
+### 2.3 Register refactor
+
+- [x] `RegisterCommandHandler` рефакторирован — делегирует `CreateEmployeeCommand` через `CommandBus` (не bypasses `EmployeeEntity`).
 
 ### 2.3 User module (`src/modules/identity/user/`)
 
 - [x] `user.repository.port.ts` — `UserRepositoryPort extends RepositoryPort<UserEntity>` + `findByEmail`.
 - [x] `user-prisma.repository.ts` — реализован: `save`, `findById`, `findByEmail`, `delete`. ⚠ Технический долг: внутри используется `this.prismaService.client.user.*` — должен быть `this.db.user.*`, чтобы методы видели активную транзакцию из `RequestContextService`. Поправить при первой правке этого файла.
 - [x] `UserService` — упразднён, заменён на CQRS handlers + репозиторий.
-- [ ] **`UserEntity` + `CreateUserCommand` обновить под новую схему** — добавить обязательный `roleId` (FK на `Role`, `Restrict`-удаление). Сейчас в `CreateUserRequestDto` и `UserEntity.create` его нет — для регистрации без указанной роли регистрация будет падать на FK-constraint.
 - [ ] **`DeleteUserCommand`** — есть пустой `delete-user.command.ts`, handler не написан. Доделать.
 - [ ] Прочее API через CQRS: `UpdateUserCommand` (email/password — отдельные команды? одна команда с private fields? — решить при добавлении профиля). `FindUserByEmailQuery` понадобится для auth-флоу (вернёт `User` с `role` через `include: { role: true }` — read-side direct-Prisma путь).
 

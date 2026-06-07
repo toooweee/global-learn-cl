@@ -19,7 +19,7 @@ export class Command implements ICommand {
     this.metadata = {
       correlationId:
         props?.metadata?.correlationId || RequestContextService.getRequestId(),
-      userId: props?.metadata?.userId,
+      userId: props?.metadata?.userId ?? RequestContextService.getUserId(),
       timestamp: props?.metadata?.timestamp || Date.now(),
     };
   }

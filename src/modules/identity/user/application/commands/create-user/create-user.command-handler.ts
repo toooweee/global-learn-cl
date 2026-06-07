@@ -6,7 +6,7 @@ import {
 } from '@/modules/identity/user/application/ports/user.repository.port';
 import { Inject } from '@nestjs/common';
 import { UserEntity } from '@/modules/identity/user/domain/user.entity';
-import * as argon from 'argon2';
+import { PasswordService } from '@/libs/crypto/password.service';
 import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 
 @CommandHandler(CreateUserCommand)
@@ -14,14 +14,16 @@ export class CreateUserCommandHandler implements ICommandHandler<CreateUserComma
   constructor(
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepositoryPort,
+    private readonly passwordService: PasswordService,
   ) {}
 
   async execute(command: CreateUserCommand) {
-    const { email, password } = command;
+    const { email, password, roleId } = command;
 
     const user = UserEntity.create({
       email,
-      hashedPassword: await argon.hash(password),
+      hashedPassword: await this.passwordService.hash(password),
+      roleId,
     });
 
     await this.userRepository.transaction(async () => {

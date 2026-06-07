@@ -22,36 +22,29 @@ export class UserPrismaRepository
   async save(user: UserEntity) {
     const data = this.mapper.toPersistence(user);
 
-    await this.prismaService.client.user.create({
-      data,
+    await this.db.user.upsert({
+      where: { id: data.id },
+      create: data,
+      update: {
+        email: data.email,
+        hashedPassword: data.hashedPassword,
+        roleId: data.roleId,
+        updatedAt: data.updatedAt,
+      },
     });
   }
 
   async findById(id: AggregateId): Promise<Option<UserEntity>> {
-    const user = await this.prismaService.client.user.findUnique({
-      where: {
-        id,
-      },
-    });
-
+    const user = await this.db.user.findUnique({ where: { id } });
     return user ? Some(this.mapper.toDomain(user)) : None;
   }
 
   async findByEmail(email: string): Promise<Option<UserEntity>> {
-    const user = await this.prismaService.client.user.findUnique({
-      where: {
-        email,
-      },
-    });
-
+    const user = await this.db.user.findUnique({ where: { email } });
     return user ? Some(this.mapper.toDomain(user)) : None;
   }
 
   async delete(entity: UserEntity) {
-    await this.prismaService.client.user.delete({
-      where: {
-        id: entity.id,
-      },
-    });
+    await this.db.user.delete({ where: { id: entity.id } });
   }
 }
