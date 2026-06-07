@@ -1,5 +1,5 @@
-import { Body, Controller, Post, Req, Res } from '@nestjs/common';
-import { CommandBus } from '@nestjs/cqrs';
+import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -8,6 +8,8 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { GetMeQuery } from '@/modules/identity/auth/application/queries/get-me/get-me.query';
+import { MeResponseDto } from '@/modules/identity/auth/presentation/dto/me.response.dto';
 import type { Request, Response } from 'express';
 import { Public } from '@/libs/auth/decorators/public.decorator';
 import { Roles } from '@/libs/auth/decorators/roles.decorator';
@@ -35,7 +37,19 @@ const REFRESH_TOKEN_COOKIE = 'refresh_token';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly commandBus: CommandBus) {}
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
+  ) {}
+
+  @ApiOperation({ summary: 'Get current authenticated user' })
+  @ApiOkResponse({ type: MeResponseDto })
+  @Get('me')
+  async me(@CurrentUser() user: CurrentUserPayload): Promise<MeResponseDto> {
+    return this.queryBus.execute<GetMeQuery, MeResponseDto>(
+      new GetMeQuery(user.userId),
+    );
+  }
 
   @ApiOperation({ summary: 'Register a new employee (Admin only)' })
   @ApiCreatedResponse({ type: IdResponseDto })

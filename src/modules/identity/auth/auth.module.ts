@@ -9,6 +9,7 @@ import { LogoutCommandHandler } from '@/modules/identity/auth/application/logout
 import { RefreshTokenCommandHandler } from '@/modules/identity/auth/application/refresh-tokens/refresh-token.command-handler';
 import { ChangePasswordCommandHandler } from '@/modules/identity/auth/application/change-password/change-password.command-handler';
 import { CompleteRegistrationCommandHandler } from '@/modules/identity/auth/application/complete-registration/complete-registration.command-handler';
+import { GetMeQueryHandler } from '@/modules/identity/auth/application/queries/get-me/get-me.query-handler';
 
 const commandHandlers: Provider[] = [
   RegisterCommandHandler,
@@ -22,6 +23,6 @@ const commandHandlers: Provider[] = [
 @Module({
   imports: [TokenModule, PrismaModule, CryptoModule],
   controllers: [AuthController],
-  providers: [...commandHandlers],
+  providers: [...commandHandlers, GetMeQueryHandler],
 })
 export class AuthModule {}

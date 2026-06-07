@@ -10,6 +10,7 @@ import { OnboardingModule } from '@/modules/onboarding/onboarding.module';
 import { AuthModule } from '@/modules/identity/auth/auth.module';
 import { OrganizationModule } from '@/modules/organization/organization.module';
 import { EmployeeModule } from '@/modules/employee/employee.module';
+import { RoleModule } from '@/modules/identity/role/role.module';
 import { CqrsModule } from '@nestjs/cqrs';
 import { JwtModule } from '@nestjs/jwt';
 import { AllExceptionsFilter } from '@/infra/exception-filters/all-exceptions.filter';
@@ -38,6 +39,7 @@ const guards: Provider[] = [
     JwtModule.register({}),
     UserModule,
     AuthModule,
+    RoleModule,
     OrganizationModule,
     EmployeeModule,
     OnboardingModule,
