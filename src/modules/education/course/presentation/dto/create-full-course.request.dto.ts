@@ -10,6 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { StepType } from '@generated/client';
+import { CourseScope } from '@/modules/education/course/course.types';
 
 export class FullCourseStepDto {
   @ApiProperty() @IsString() @MinLength(1) name: string;
@@ -32,6 +33,18 @@ export class FullCourseModuleDto {
 export class CreateFullCourseRequestDto {
   @ApiProperty() @IsString() @MinLength(1) name: string;
   @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+  @ApiPropertyOptional({ enum: CourseScope, default: CourseScope.ALL })
+  @IsOptional()
+  @IsEnum(CourseScope)
+  scope?: CourseScope;
+  @ApiPropertyOptional({ description: 'Required when scope=DEPARTMENT' })
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+  @ApiPropertyOptional({ description: 'Required when scope=DIVISION' })
+  @IsOptional()
+  @IsUUID()
+  divisionId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() coverId?: string;
 
   @ApiPropertyOptional({ type: [FullCourseModuleDto] })

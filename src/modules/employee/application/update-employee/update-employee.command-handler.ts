@@ -41,6 +41,8 @@ export class UpdateEmployeeCommandHandler implements ICommandHandler<
           command.positionId !== undefined
             ? command.positionId
             : props.positionId,
+        avatarId:
+          command.avatarId !== undefined ? command.avatarId : props.avatarId,
         updatedAt: new Date(),
       },
     });

@@ -1,9 +1,12 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { ApplicationException } from '@/libs/application/exceptions/application.exception';
+import { RequestContextService } from '@/libs/application/context/app-request-context';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { courseInclude } from '@/modules/education/course/course.mapper';
 import {
+  CourseScopeDto,
   CourseResponseDto,
+  EnrollmentProgressDto,
   ModuleResponseDto,
   StepResponseDto,
 } from '@/modules/education/course/presentation/dto/course.response.dto';
@@ -17,10 +20,30 @@ export class FindCourseQueryHandler implements IQueryHandler<
   constructor(private readonly prismaService: PrismaService) {}
 
   async execute(query: FindCourseQuery): Promise<CourseResponseDto> {
-    const row = await this.prismaService.client.course.findUnique({
-      where: { id: query.courseId },
-      include: courseInclude,
-    });
+    const userId = RequestContextService.getUserId();
+
+    const [row, enrollment] = await Promise.all([
+      this.prismaService.client.course.findUnique({
+        where: { id: query.courseId },
+        include: courseInclude,
+      }),
+      userId
+        ? this.prismaService.client.courseEnrollment.findUnique({
+            where: {
+              courseId_employeeId: {
+                courseId: query.courseId,
+                employeeId: userId,
+              },
+            },
+            select: {
+              id: true,
+              status: true,
+              completedAt: true,
+              progress: { select: { stepId: true, completedAt: true } },
+            },
+          })
+        : Promise.resolve(null),
+    ]);
 
     if (!row) {
       throw new ApplicationException(
@@ -30,6 +53,39 @@ export class FindCourseQueryHandler implements IQueryHandler<
       );
     }
 
+    const completedStepIds = new Set<string>();
+    let enrollmentDto: EnrollmentProgressDto | undefined;
+
+    if (enrollment) {
+      enrollment.progress
+        .filter((p) => p.completedAt !== null)
+        .forEach((p) => completedStepIds.add(p.stepId));
+
+      const allStepIds = row.modules.flatMap((m) => m.steps.map((s) => s.id));
+      const completedSteps = allStepIds.filter((id) =>
+        completedStepIds.has(id),
+      ).length;
+      const totalSteps = allStepIds.length;
+
+      enrollmentDto = new EnrollmentProgressDto({
+        enrollmentId: enrollment.id,
+        status: enrollment.status,
+        completedSteps,
+        totalSteps,
+        completionRate:
+          totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0,
+        completedAt: enrollment.completedAt ?? undefined,
+      });
+    }
+
+    const scopeInfo = new CourseScopeDto({
+      scope: row.scope,
+      departmentId: row.departmentId ?? undefined,
+      departmentName: row.department?.name,
+      divisionId: row.divisionId ?? undefined,
+      divisionName: row.division?.name,
+    });
+
     return new CourseResponseDto({
       id: row.id,
       createdAt: row.createdAt,
@@ -38,6 +94,7 @@ export class FindCourseQueryHandler implements IQueryHandler<
       description: row.description,
       authorId: row.authorId,
       coverId: row.coverId,
+      scopeInfo,
       modules: row.modules.map(
         (mod) =>
           new ModuleResponseDto({
@@ -54,10 +111,12 @@ export class FindCourseQueryHandler implements IQueryHandler<
                   lessonId: step.lessonId ?? undefined,
                   lessonContent: step.lesson?.content ?? undefined,
                   testId: step.testId ?? undefined,
+                  isCompleted: completedStepIds.has(step.id),
                 }),
             ),
           }),
       ),
+      enrollment: enrollmentDto,
     });
   }
 }

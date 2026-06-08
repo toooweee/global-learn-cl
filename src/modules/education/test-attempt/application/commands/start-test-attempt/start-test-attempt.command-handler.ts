@@ -26,6 +26,18 @@ export class StartTestAttemptCommandHandler implements ICommandHandler<
       throw new ApplicationException('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
+    const active = await this.repository.findActiveByEmployeeAndTest(
+      employeeId,
+      command.testId,
+    );
+    if (active.isSome()) {
+      throw new ApplicationException(
+        'You already have an active attempt for this test',
+        409,
+        'TEST_ATTEMPT_ALREADY_IN_PROGRESS',
+      );
+    }
+
     const attempt = TestAttemptEntity.create({
       testId: command.testId,
       employeeId,

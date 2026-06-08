@@ -67,6 +67,7 @@ model Department {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   divisions Division[]
+  courses   Course[]   @relation("CourseDepartment")
 
   @@map("departments")
 }
@@ -82,6 +83,7 @@ model Division {
   department          Department           @relation(fields: [departmentId], references: [id])
   employees           Employee[]
   onboardingTemplates OnboardingTemplate[]
+  courses             Course[]             @relation("CourseDivision")
 
   @@map("divisions")
 }
@@ -153,17 +155,31 @@ model File {
 // Education
 // ============================================================
 
+enum CourseScope {
+  ALL
+  DEPARTMENT
+  DIVISION
+
+  @@map("course_scope")
+}
+
 model Course {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @db.VarChar(255)
-  description String   @db.Text
-  authorId    String   @map("author_id") @db.Uuid
-  coverId     String?  @map("cover_id") @db.Uuid
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id           String      @id @default(uuid()) @db.Uuid
+  name         String      @db.VarChar(255)
+  description  String      @db.Text
+  scope        CourseScope @default(ALL)
+  authorId     String      @map("author_id") @db.Uuid
+  coverId      String?     @map("cover_id") @db.Uuid
+  departmentId String?     @map("department_id") @db.Uuid
+  divisionId   String?     @map("division_id") @db.Uuid
+  isArchived   Boolean     @default(false) @map("is_archived")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz
 
   author                  Employee                 @relation("CourseAuthor", fields: [authorId], references: [id])
   cover                   File?                    @relation("CourseCover", fields: [coverId], references: [id], onDelete: SetNull)
+  department              Department?              @relation("CourseDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
+  division                Division?                @relation("CourseDivision", fields: [divisionId], references: [id], onDelete: SetNull)
   modules                 Module[]
   questions               CourseQuestion[]
   enrollments             CourseEnrollment[]

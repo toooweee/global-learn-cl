@@ -15,8 +15,12 @@ export class FindEmployeesQueryHandler implements IQueryHandler<
   async execute(
     query: FindEmployeesQuery,
   ): Promise<Paginated<EmployeeResponseDto>> {
-    const { limit, page, offset, divisionId } = query;
-    const where = divisionId ? { divisionId } : {};
+    const { limit, page, offset, divisionId, departmentId, roleId } = query;
+
+    const where: Record<string, unknown> = {};
+    if (divisionId) where.divisionId = divisionId;
+    if (departmentId) where.division = { departmentId };
+    if (roleId) where.user = { roleId };
 
     const [count, data] = await Promise.all([
       this.prismaService.client.employee.count({ where }),

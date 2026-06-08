@@ -5,6 +5,7 @@ import {
   AddModuleProps,
   AddStepProps,
   CourseProps,
+  CourseScope,
   CreateCourseProps,
   ModuleProps,
   UpdateCourseMetadataProps,
@@ -16,10 +17,25 @@ export class CourseEntity extends Entity<CourseProps> {
   }
 
   static create(props: CreateCourseProps): CourseEntity {
+    const scope = props.scope ?? CourseScope.ALL;
+    if (scope === CourseScope.DEPARTMENT && !props.departmentId) {
+      throw new DomainException(
+        'departmentId is required when scope is DEPARTMENT',
+        'COURSE_SCOPE_DEPARTMENT_REQUIRES_DEPARTMENT_ID',
+      );
+    }
+    if (scope === CourseScope.DIVISION && !props.divisionId) {
+      throw new DomainException(
+        'divisionId is required when scope is DIVISION',
+        'COURSE_SCOPE_DIVISION_REQUIRES_DIVISION_ID',
+      );
+    }
     return new CourseEntity({
       id: randomUUID(),
       props: {
         ...props,
+        scope,
+        isArchived: false,
         modules: [],
         createdAt: new Date(),
       },
@@ -39,6 +55,35 @@ export class CourseEntity extends Entity<CourseProps> {
       this._props.description = updates.description;
     if ('coverId' in updates) {
       this._props.coverId = updates.coverId ?? undefined;
+    }
+    if (updates.scope !== undefined) {
+      if (
+        updates.scope === CourseScope.DEPARTMENT &&
+        !this._props.departmentId &&
+        !updates.departmentId
+      ) {
+        throw new DomainException(
+          'departmentId is required when scope is DEPARTMENT',
+          'COURSE_SCOPE_DEPARTMENT_REQUIRES_DEPARTMENT_ID',
+        );
+      }
+      if (
+        updates.scope === CourseScope.DIVISION &&
+        !this._props.divisionId &&
+        !updates.divisionId
+      ) {
+        throw new DomainException(
+          'divisionId is required when scope is DIVISION',
+          'COURSE_SCOPE_DIVISION_REQUIRES_DIVISION_ID',
+        );
+      }
+      this._props.scope = updates.scope;
+    }
+    if ('departmentId' in updates) {
+      this._props.departmentId = updates.departmentId ?? undefined;
+    }
+    if ('divisionId' in updates) {
+      this._props.divisionId = updates.divisionId ?? undefined;
     }
     this._props.updatedAt = new Date();
   }

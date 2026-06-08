@@ -1,4 +1,6 @@
-import { StepType } from '@generated/client';
+import { CourseScope, StepType } from '@generated/client';
+
+export { CourseScope };
 
 export interface StepProps {
   id: string;
@@ -19,8 +21,12 @@ export interface ModuleProps {
 export interface CourseProps {
   name: string;
   description: string;
+  scope: CourseScope;
+  departmentId?: string;
+  divisionId?: string;
   authorId: string;
   coverId?: string;
+  isArchived: boolean;
   modules: ModuleProps[];
   createdAt: Date;
   updatedAt?: Date;
@@ -29,6 +35,9 @@ export interface CourseProps {
 export interface CreateCourseProps {
   name: string;
   description: string;
+  scope?: CourseScope;
+  departmentId?: string;
+  divisionId?: string;
   authorId: string;
   coverId?: string;
 }
@@ -49,4 +58,7 @@ export interface UpdateCourseMetadataProps {
   name?: string;
   description?: string;
   coverId?: string | null;
+  scope?: CourseScope;
+  departmentId?: string | null;
+  divisionId?: string | null;
 }

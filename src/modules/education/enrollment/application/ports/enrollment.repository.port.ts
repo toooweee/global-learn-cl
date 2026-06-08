@@ -19,4 +19,5 @@ export interface EnrollmentRepositoryPort {
     employeeId: string,
   ): Promise<Option<EnrollmentEntity>>;
   findMany(params: FindEnrollmentsParams): Promise<Paginated<EnrollmentEntity>>;
+  clearProgress(enrollmentId: string): Promise<void>;
 }

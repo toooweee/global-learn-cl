@@ -13,6 +13,8 @@ export const courseInclude = {
       },
     },
   },
+  department: { select: { id: true, name: true } },
+  division: { select: { id: true, name: true } },
 } satisfies Prisma.CourseInclude;
 
 export type CourseRecord = Prisma.CourseGetPayload<{
@@ -27,8 +29,12 @@ export class CourseMapper implements ToDomain<CourseRecord, CourseEntity> {
       props: {
         name: row.name,
         description: row.description,
+        scope: row.scope,
+        departmentId: row.departmentId ?? undefined,
+        divisionId: row.divisionId ?? undefined,
         authorId: row.authorId,
         coverId: row.coverId ?? undefined,
+        isArchived: row.isArchived,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         modules: row.modules.map((mod) => ({

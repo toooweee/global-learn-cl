@@ -34,7 +34,9 @@ import {
   AddQuestionToTestRequestDto,
   CreateCourseQuestionRequestDto,
   TestDefinitionRequestDto,
+  UpdateCourseQuestionRequestDto,
 } from './dto/test-definition.request.dto';
+import { UpdateCourseQuestionCommand } from '@/modules/education/test-definition/application/commands/update-course-question/update-course-question.command';
 import {
   CourseQuestionResponseDto,
   TestDefinitionResponseDto,
@@ -155,6 +157,24 @@ export class TestDefinitionController {
   ): Promise<CourseQuestionResponseDto[]> {
     return this.queryBus.execute(
       new FindCourseQuestionsQuery({ courseId: id }),
+    );
+  }
+
+  @Patch('questions/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Update a course question text and/or answers' })
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse()
+  updateQuestion(
+    @Param() { id }: IdRequestDto,
+    @Body() dto: UpdateCourseQuestionRequestDto,
+  ): Promise<void> {
+    return this.commandBus.execute(
+      new UpdateCourseQuestionCommand({
+        questionId: id,
+        question: dto.question,
+        answers: dto.answers,
+      }),
     );
   }
 

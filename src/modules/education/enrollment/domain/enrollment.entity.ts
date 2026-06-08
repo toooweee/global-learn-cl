@@ -72,4 +72,18 @@ export class EnrollmentEntity extends Entity<EnrollmentProps> {
     this._props.status = EnrollmentStatus.CANCELLED;
     this._props.updatedAt = new Date();
   }
+
+  reactivate(): void {
+    if (this._props.status !== EnrollmentStatus.CANCELLED) {
+      throw new DomainException(
+        'Only cancelled enrollments can be reactivated',
+        'ENROLLMENT_NOT_CANCELLED',
+      );
+    }
+    this._props.status = EnrollmentStatus.IN_PROGRESS;
+    this._props.startedAt = new Date();
+    this._props.completedAt = undefined;
+    this._props.progress = [];
+    this._props.updatedAt = new Date();
+  }
 }

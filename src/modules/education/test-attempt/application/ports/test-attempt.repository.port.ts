@@ -6,4 +6,8 @@ export const TEST_ATTEMPT_REPOSITORY = Symbol('TEST_ATTEMPT_REPOSITORY');
 export interface TestAttemptRepositoryPort {
   save(entity: TestAttemptEntity): Promise<void>;
   findById(id: string): Promise<Option<TestAttemptEntity>>;
+  findActiveByEmployeeAndTest(
+    employeeId: string,
+    testId: string,
+  ): Promise<Option<TestAttemptEntity>>;
 }

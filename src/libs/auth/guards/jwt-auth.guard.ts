@@ -30,8 +30,6 @@ export class JwtAuthGuard implements CanActivate {
 
     const token = cookies.get(cookieConstants.ACCESS_TOKEN);
 
-    console.log(token);
-
     if (!token) {
       throw new ApplicationException('No token provided', 401, 'UNAUTHORIZED');
     }

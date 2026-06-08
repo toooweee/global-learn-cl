@@ -2,17 +2,19 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
   Post,
 } from '@nestjs/common';
-import { CommandBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
@@ -22,18 +24,23 @@ import { Roles } from '@/libs/auth/decorators/roles.decorator';
 import { CreateLessonCommand } from '@/modules/education/lesson/application/commands/create-lesson/create-lesson.command';
 import { UpdateLessonCommand } from '@/modules/education/lesson/application/commands/update-lesson/update-lesson.command';
 import { DeleteLessonCommand } from '@/modules/education/lesson/application/commands/delete-lesson/delete-lesson.command';
+import { FindLessonQuery } from '@/modules/education/lesson/application/queries/find-lesson/find-lesson.query';
 import {
   CreateLessonRequestDto,
   UpdateLessonRequestDto,
 } from './dto/lesson.request.dto';
+import { LessonResponseDto } from './dto/lesson.response.dto';
 
 @ApiTags('lessons')
 @Controller('lessons')
-@Roles('Admin')
 export class LessonController {
-  constructor(private readonly commandBus: CommandBus) {}
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
+  ) {}
 
   @Post()
+  @Roles('Admin')
   @ApiOperation({ summary: 'Create a lesson' })
   @ApiCreatedResponse({ type: IdResponseDto })
   create(@Body() dto: CreateLessonRequestDto): Promise<IdResponseDto> {
@@ -42,7 +49,16 @@ export class LessonController {
     );
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Get lesson by ID' })
+  @ApiOkResponse({ type: LessonResponseDto })
+  @ApiNotFoundResponse()
+  findOne(@Param() { id }: IdRequestDto): Promise<LessonResponseDto> {
+    return this.queryBus.execute(new FindLessonQuery({ lessonId: id }));
+  }
+
   @Patch(':id')
+  @Roles('Admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Update lesson name and/or content' })
   @ApiNoContentResponse()
@@ -61,6 +77,7 @@ export class LessonController {
   }
 
   @Delete(':id')
+  @Roles('Admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a lesson' })
   @ApiNoContentResponse()

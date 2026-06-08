@@ -7,7 +7,6 @@ export interface CurrentUserPayload {
 }
 
 export const CurrentUser = createParamDecorator(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   (_data: unknown, _ctx: ExecutionContext): CurrentUserPayload => {
     return {
       userId: RequestContextService.getUserId()!,

@@ -6,6 +6,7 @@ export class UpdateEmployeeCommand extends Command {
   readonly biography?: string | null;
   readonly divisionId?: string;
   readonly positionId?: string | null;
+  readonly avatarId?: string | null;
 
   constructor(props: CommandProps<UpdateEmployeeCommand>) {
     super(props);
@@ -14,5 +15,6 @@ export class UpdateEmployeeCommand extends Command {
     this.biography = props.biography;
     this.divisionId = props.divisionId;
     this.positionId = props.positionId;
+    this.avatarId = props.avatarId;
   }
 }

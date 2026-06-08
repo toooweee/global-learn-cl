@@ -29,6 +29,9 @@ export class CreateFullCourseCommandHandler implements ICommandHandler<
     const course = CourseEntity.create({
       name: command.name,
       description: command.description ?? '',
+      scope: command.scope,
+      departmentId: command.departmentId,
+      divisionId: command.divisionId,
       authorId,
       coverId: command.coverId,
     });

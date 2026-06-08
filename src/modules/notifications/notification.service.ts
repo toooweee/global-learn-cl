@@ -46,11 +46,16 @@ export class NotificationService {
     });
   }
 
-  async findByUser(userId: string) {
+  async findByUser(userId: string, limit = 20, offset = 0) {
     return this.prismaService.client.notification.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: limit,
+      skip: offset,
     });
+  }
+
+  async countByUser(userId: string): Promise<number> {
+    return this.prismaService.client.notification.count({ where: { userId } });
   }
 }

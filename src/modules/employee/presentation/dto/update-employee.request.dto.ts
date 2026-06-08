@@ -21,4 +21,12 @@ export class UpdateEmployeeRequestDto {
   @IsOptional()
   @IsUUID()
   positionId?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'ID файла-аватарки (из POST /files)',
+  })
+  @IsOptional()
+  @IsUUID()
+  avatarId?: string | null;
 }

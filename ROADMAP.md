@@ -149,6 +149,8 @@
 - [x] Commands: `create-course`, `update-course`, `delete-course`, `add-module`, `remove-module`, `add-step`, `remove-step`.
 - [x] Queries: `find-course` (by ID, direct Prisma → `CourseResponseDto`), `find-courses` (paginated → `CourseSummaryResponseDto`).
 - [x] `CourseController` — `POST /courses`, `GET /courses`, `GET /courses/:id`, `PATCH /courses/:id`, `DELETE /courses/:id`, `POST /courses/:id/modules`, `DELETE /courses/:id/modules/:moduleId`, `POST /courses/:id/modules/:moduleId/steps`, `DELETE /courses/:id/modules/:moduleId/steps/:stepId`.
+- [x] **Course scope** (2026-06-08): `CourseScope` enum (`ALL | DEPARTMENT | DIVISION`) добавлен в схему + `Course.scope`, `Course.departmentId`, `Course.divisionId`. Доменные инварианты в `CourseEntity.create/updateMetadata`. `courseInclude` расширен department/division. `GET /courses` поддерживает фильтры `?scope`, `?departmentId`, `?divisionId`. Все create/update команды и DTO обновлены.
+- [x] **Обогащение курсовых запросов** (2026-06-08): `GET /courses/:id` — возвращает `scopeInfo {scope, departmentId, departmentName, divisionId, divisionName}`, полный список модулей со шагами, прогресс текущего пользователя (`enrollment {status, completedSteps, totalSteps, completionRate}`), `isCompleted` на каждом шаге, `completedSteps/totalSteps` на каждом модуле. `GET /courses` — возвращает `moduleCount`, `scopeInfo`, прогресс текущего пользователя (1 доп. запрос на всю страницу через `findMany`).
 
 ### 4.2 Course-application (заявки на курсы) ✅
 

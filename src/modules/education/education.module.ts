@@ -19,6 +19,7 @@ import { FindCourseQueryHandler } from '@/modules/education/course/application/q
 import { FindCoursesQueryHandler } from '@/modules/education/course/application/queries/find-courses/find-courses.query-handler';
 import { GetCoursesOverviewQueryHandler } from '@/modules/education/course/application/queries/get-courses-overview/get-courses-overview.query-handler';
 import { GetCourseAnalyticsQueryHandler } from '@/modules/education/course/application/queries/get-course-analytics/get-course-analytics.query-handler';
+import { ArchiveCourseCommandHandler } from '@/modules/education/course/application/commands/archive-course/archive-course.command-handler';
 import { CourseController } from '@/modules/education/course/presentation/course.controller';
 
 // CourseApplication
@@ -62,6 +63,7 @@ import { LessonPrismaRepository } from '@/modules/education/lesson/infra/lesson-
 import { CreateLessonCommandHandler } from '@/modules/education/lesson/application/commands/create-lesson/create-lesson.command-handler';
 import { UpdateLessonCommandHandler } from '@/modules/education/lesson/application/commands/update-lesson/update-lesson.command-handler';
 import { DeleteLessonCommandHandler } from '@/modules/education/lesson/application/commands/delete-lesson/delete-lesson.command-handler';
+import { FindLessonQueryHandler } from '@/modules/education/lesson/application/queries/find-lesson/find-lesson.query-handler';
 import { LessonController } from '@/modules/education/lesson/presentation/lesson.controller';
 
 // TestDefinition + CourseQuestion
@@ -80,6 +82,7 @@ import { DeleteTestDefinitionCommandHandler } from '@/modules/education/test-def
 import { AddQuestionToTestCommandHandler } from '@/modules/education/test-definition/application/commands/add-question-to-test/add-question-to-test.command-handler';
 import { RemoveQuestionFromTestCommandHandler } from '@/modules/education/test-definition/application/commands/remove-question-from-test/remove-question-from-test.command-handler';
 import { CreateCourseQuestionCommandHandler } from '@/modules/education/test-definition/application/commands/create-course-question/create-course-question.command-handler';
+import { UpdateCourseQuestionCommandHandler } from '@/modules/education/test-definition/application/commands/update-course-question/update-course-question.command-handler';
 import { DeleteCourseQuestionCommandHandler } from '@/modules/education/test-definition/application/commands/delete-course-question/delete-course-question.command-handler';
 import { FindTestDefinitionQueryHandler } from '@/modules/education/test-definition/application/queries/find-test-definition/find-test-definition.query-handler';
 import { FindCourseQuestionsQueryHandler } from '@/modules/education/test-definition/application/queries/find-course-questions/find-course-questions.query-handler';
@@ -111,6 +114,7 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     FindCoursesQueryHandler,
     GetCoursesOverviewQueryHandler,
     GetCourseAnalyticsQueryHandler,
+    ArchiveCourseCommandHandler,
 
     // CourseApplication
     CourseApplicationMapper,
@@ -149,6 +153,7 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     CreateLessonCommandHandler,
     UpdateLessonCommandHandler,
     DeleteLessonCommandHandler,
+    FindLessonQueryHandler,
 
     // TestDefinition + CourseQuestion
     TestDefinitionMapper,
@@ -166,6 +171,7 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     AddQuestionToTestCommandHandler,
     RemoveQuestionFromTestCommandHandler,
     CreateCourseQuestionCommandHandler,
+    UpdateCourseQuestionCommandHandler,
     DeleteCourseQuestionCommandHandler,
     FindTestDefinitionQueryHandler,
     FindCourseQuestionsQueryHandler,

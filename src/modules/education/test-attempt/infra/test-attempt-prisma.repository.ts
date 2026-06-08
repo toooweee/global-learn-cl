@@ -64,4 +64,15 @@ export class TestAttemptPrismaRepository
     });
     return row ? Some(this.mapper.toDomain(row)) : None;
   }
+
+  async findActiveByEmployeeAndTest(
+    employeeId: string,
+    testId: string,
+  ): Promise<Option<TestAttemptEntity>> {
+    const row = await this.db.testAttempt.findFirst({
+      where: { employeeId, testId, endedAt: null },
+      include: testAttemptInclude,
+    });
+    return row ? Some(this.mapper.toDomain(row)) : None;
+  }
 }

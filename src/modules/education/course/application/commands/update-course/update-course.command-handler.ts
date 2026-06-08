@@ -32,6 +32,9 @@ export class UpdateCourseCommandHandler implements ICommandHandler<
       name: command.name,
       description: command.description,
       coverId: command.coverId,
+      scope: command.scope,
+      departmentId: command.departmentId,
+      divisionId: command.divisionId,
     });
 
     await this.repository.save(course);

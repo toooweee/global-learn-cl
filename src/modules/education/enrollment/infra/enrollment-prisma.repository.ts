@@ -84,6 +84,10 @@ export class EnrollmentPrismaRepository
     return row ? Some(this.mapper.toDomain(row)) : None;
   }
 
+  async clearProgress(enrollmentId: string): Promise<void> {
+    await this.db.stepProgress.deleteMany({ where: { enrollmentId } });
+  }
+
   async findMany(
     params: FindEnrollmentsParams,
   ): Promise<Paginated<EnrollmentEntity>> {

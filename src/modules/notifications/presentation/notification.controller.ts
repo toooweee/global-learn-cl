@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiNoContentResponse,
@@ -14,6 +15,8 @@ import {
 } from '@nestjs/swagger';
 import { RequestContextService } from '@/libs/application/context/app-request-context';
 import { IdRequestDto } from '@/libs/api/dto/id.request.dto';
+import { PaginatedQueryRequestDto } from '@/libs/api/dto/paginated.query.request.dto';
+import { PaginatedResponseDto } from '@/libs/api/dto/paginated.response.dto';
 import { NotificationService } from '../notification.service';
 import { NotificationResponseDto } from './dto/notification.response.dto';
 
@@ -23,12 +26,25 @@ export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List my notifications (last 50)' })
-  @ApiOkResponse({ type: [NotificationResponseDto] })
-  async findMine(): Promise<NotificationResponseDto[]> {
+  @ApiOperation({ summary: 'List my notifications (paginated)' })
+  @ApiOkResponse({ type: PaginatedResponseDto })
+  async findMine(
+    @Query() query: PaginatedQueryRequestDto,
+  ): Promise<PaginatedResponseDto<NotificationResponseDto>> {
     const userId = RequestContextService.getUserId()!;
-    const rows = await this.notificationService.findByUser(userId);
-    return rows.map((r) => new NotificationResponseDto(r));
+    const offset = (query.page - 1) * query.limit;
+
+    const [rows, count] = await Promise.all([
+      this.notificationService.findByUser(userId, query.limit, offset),
+      this.notificationService.countByUser(userId),
+    ]);
+
+    return new PaginatedResponseDto({
+      count,
+      limit: query.limit,
+      page: query.page,
+      data: rows.map((r) => new NotificationResponseDto(r)),
+    });
   }
 
   @Post(':id/read')

@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayNotEmpty,
   IsArray,
@@ -65,4 +65,20 @@ export class AddQuestionToTestRequestDto {
   @ApiProperty({ example: '3fa85f64-5717-4562-b3fc-2c963f66afa6' })
   @IsUUID()
   questionId: string;
+}
+
+export class UpdateCourseQuestionRequestDto {
+  @ApiPropertyOptional({ example: 'What is NestJS?' })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  question?: string;
+
+  @ApiPropertyOptional({ type: [CourseAnswerRequestDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => CourseAnswerRequestDto)
+  answers?: CourseAnswerRequestDto[];
 }

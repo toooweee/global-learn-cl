@@ -17,6 +17,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '@/libs/auth/decorators/roles.decorator';
+import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 import { CurrentUser } from '@/libs/auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '@/libs/auth/decorators/current-user.decorator';
 import { IdResponseDto, PaginatedResponseDto } from '@/libs/api/dto';
@@ -43,6 +44,16 @@ class EmployeeFilterQueryDto extends PaginatedQueryRequestDto {
   @IsOptional()
   @IsUUID()
   divisionId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @ApiPropertyOptional({ description: 'Фильтр по ID роли' })
+  @IsOptional()
+  @IsUUID()
+  roleId?: string;
 }
 
 @ApiTags('employees')
@@ -78,6 +89,8 @@ export class EmployeeController {
         limit: query.limit,
         page: query.page,
         divisionId: query.divisionId,
+        departmentId: query.departmentId,
+        roleId: query.roleId,
       }),
     );
     return new PaginatedResponseDto<EmployeeResponseDto>({
@@ -110,14 +123,22 @@ export class EmployeeController {
     );
   }
 
-  @ApiOperation({ summary: 'Update employee' })
+  @ApiOperation({ summary: 'Update employee (self or Admin)' })
   @ApiOkResponse()
   @ApiNotFoundResponse()
   @Patch(':id')
   async update(
     @Param() params: IdRequestDto,
     @Body() body: UpdateEmployeeRequestDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<void> {
+    if (user.role !== 'Admin' && user.userId !== params.id) {
+      throw new ApplicationException(
+        'You can only update your own profile',
+        403,
+        'FORBIDDEN',
+      );
+    }
     await this.commandBus.execute<UpdateEmployeeCommand, void>(
       new UpdateEmployeeCommand({
         employeeId: params.id,
@@ -125,6 +146,7 @@ export class EmployeeController {
         biography: body.biography,
         divisionId: body.divisionId,
         positionId: body.positionId,
+        avatarId: body.avatarId,
       }),
     );
   }

@@ -22,6 +22,7 @@ import {
 import { IdResponseDto } from '@/libs/api/dto';
 import { IdRequestDto } from '@/libs/api/dto/id.request.dto';
 import { PaginatedQueryRequestDto } from '@/libs/api/dto/paginated.query.request.dto';
+import { FindCoursesRequestDto } from './dto/find-courses.request.dto';
 import { PaginatedResponseDto } from '@/libs/api/dto/paginated.response.dto';
 import { Roles } from '@/libs/auth/decorators/roles.decorator';
 import { CreateCourseCommand } from '@/modules/education/course/application/commands/create-course/create-course.command';
@@ -49,6 +50,7 @@ import {
   CoursesOverviewItemDto,
 } from './dto/course-analytics.response.dto';
 import { CreateFullCourseCommand } from '@/modules/education/course/application/commands/create-full-course/create-full-course.command';
+import { ArchiveCourseCommand } from '@/modules/education/course/application/commands/archive-course/archive-course.command';
 
 @ApiTags('courses')
 @Controller('courses')
@@ -67,6 +69,9 @@ export class CourseController {
       new CreateCourseCommand({
         name: dto.name,
         description: dto.description,
+        scope: dto.scope,
+        departmentId: dto.departmentId,
+        divisionId: dto.divisionId,
         coverId: dto.coverId,
       }),
     );
@@ -83,6 +88,9 @@ export class CourseController {
       new CreateFullCourseCommand({
         name: dto.name,
         description: dto.description ?? '',
+        scope: dto.scope,
+        departmentId: dto.departmentId,
+        divisionId: dto.divisionId,
         coverId: dto.coverId,
         modules: dto.modules ?? [],
       }),
@@ -90,13 +98,24 @@ export class CourseController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List courses' })
+  @ApiOperation({
+    summary:
+      'List courses (filtered by scope, department, division, visibleToMe, includeArchived)',
+  })
   @ApiOkResponse({ type: PaginatedResponseDto })
   findAll(
-    @Query() query: PaginatedQueryRequestDto,
+    @Query() query: FindCoursesRequestDto,
   ): Promise<PaginatedResponseDto<CourseSummaryResponseDto>> {
     return this.queryBus.execute(
-      new FindCoursesQuery({ limit: query.limit, page: query.page }),
+      new FindCoursesQuery({
+        limit: query.limit,
+        page: query.page,
+        scope: query.scope,
+        departmentId: query.departmentId,
+        divisionId: query.divisionId,
+        visibleToMe: query.visibleToMe,
+        includeArchived: query.includeArchived,
+      }),
     );
   }
 
@@ -150,6 +169,9 @@ export class CourseController {
         name: dto.name,
         description: dto.description,
         coverId: dto.coverId,
+        scope: dto.scope,
+        departmentId: dto.departmentId,
+        divisionId: dto.divisionId,
       }),
     );
   }
@@ -162,6 +184,30 @@ export class CourseController {
   @ApiNotFoundResponse()
   remove(@Param() { id }: IdRequestDto): Promise<void> {
     return this.commandBus.execute(new DeleteCourseCommand({ courseId: id }));
+  }
+
+  @Patch(':id/archive')
+  @Roles('Admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Archive a course (hides it from listings)' })
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse()
+  archive(@Param() { id }: IdRequestDto): Promise<void> {
+    return this.commandBus.execute(
+      new ArchiveCourseCommand({ courseId: id, archive: true }),
+    );
+  }
+
+  @Patch(':id/unarchive')
+  @Roles('Admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Unarchive a course' })
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse()
+  unarchive(@Param() { id }: IdRequestDto): Promise<void> {
+    return this.commandBus.execute(
+      new ArchiveCourseCommand({ courseId: id, archive: false }),
+    );
   }
 
   @Post(':id/modules')

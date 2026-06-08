@@ -33,7 +33,11 @@ export class CoursePrismaRepository
       update: {
         name: props.name,
         description: props.description,
+        scope: props.scope,
+        departmentId: props.departmentId ?? null,
+        divisionId: props.divisionId ?? null,
         coverId: props.coverId ?? null,
+        isArchived: props.isArchived,
         updatedAt: props.updatedAt ?? new Date(),
         modules: {
           deleteMany: {},
@@ -58,8 +62,12 @@ export class CoursePrismaRepository
         id: entity.id,
         name: props.name,
         description: props.description,
+        scope: props.scope,
+        departmentId: props.departmentId ?? null,
+        divisionId: props.divisionId ?? null,
         authorId: props.authorId,
         coverId: props.coverId ?? null,
+        isArchived: props.isArchived,
         createdAt: props.createdAt,
         modules: {
           create: props.modules.map((mod) => ({

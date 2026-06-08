@@ -104,8 +104,6 @@ export class AuthController {
       new LoginCommand({ ...body, userAgent }),
     );
 
-    console.log(issuance);
-
     const cookies = cookieFactory(req, res);
     cookies.set(
       cookieConstants.ACCESS_TOKEN,
