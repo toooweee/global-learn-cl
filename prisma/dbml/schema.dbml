@@ -1,0 +1,560 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Table users {
+  id String [pk]
+  email String [unique, not null]
+  hashedPassword String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  employee employees
+  token tokens [not null]
+  notifications notifications [not null]
+  role roles [not null]
+  roleId String [not null]
+}
+
+Table tokens {
+  id String [pk]
+  hashedToken String [not null]
+  userAgent String [not null]
+  expiresAt DateTime [not null]
+  user users [not null]
+  userId String [not null]
+
+  indexes {
+    (userId, userAgent) [unique]
+  }
+}
+
+Table roles {
+  id String [pk]
+  name String [unique, not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  users users [not null]
+}
+
+Table departments {
+  id String [pk]
+  name String [unique, not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  divisions divisions [not null]
+}
+
+Table divisions {
+  id String [pk]
+  name String [unique, not null]
+  isActive Boolean [not null, default: true]
+  departmentId String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  department departments [not null]
+  employees employees [not null]
+  onboardingTemplates onboarding_templates [not null]
+}
+
+Table positions {
+  id String [pk]
+  name String [unique, not null]
+  parentId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  parent positions
+  subordinates positions [not null]
+  employees employees [not null]
+  onboardingTemplates onboarding_templates [not null]
+}
+
+Table employees {
+  id String [pk]
+  fullname String [not null]
+  biography String
+  birthDate DateTime
+  employmentDate DateTime [not null]
+  dismissalDate DateTime
+  divisionId String [not null]
+  positionId String
+  avatarId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  user users [not null]
+  division divisions [not null]
+  position positions
+  avatar files
+  authoredCourses courses [not null]
+  enrollments course_enrollments [not null]
+  assignedEnrollments course_enrollments [not null]
+  courseApplications course_applications [not null]
+  testAttempts test_attempts [not null]
+  onboardingsAssigned onboardings [not null]
+  onboardingsReceived onboardings [not null]
+  chatMessagesSent onboarding_chat_messages [not null]
+}
+
+Table files {
+  id String [pk]
+  url String [not null]
+  courses courses [not null]
+  employeeAvatars employees [not null]
+  onboardingTemplates onboarding_templates [not null]
+  onboardingTemplateSteps onboarding_template_steps [not null]
+  lessonVideos lessons [not null]
+}
+
+Table courses {
+  id String [pk]
+  name String [not null]
+  description String [not null]
+  authorId String [not null]
+  coverId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  author employees [not null]
+  cover files
+  modules modules [not null]
+  questions course_questions [not null]
+  enrollments course_enrollments [not null]
+  applications course_applications [not null]
+  onboardingTemplateSteps onboarding_template_steps [not null]
+  onboardingSteps onboarding_steps [not null]
+}
+
+Table modules {
+  id String [pk]
+  courseId String [not null]
+  position Int [not null]
+  name String [not null]
+  course courses [not null]
+  steps steps [not null]
+  questions course_questions [not null]
+
+  indexes {
+    (courseId, position) [unique]
+  }
+}
+
+Table steps {
+  id String [pk]
+  moduleId String [not null]
+  position Int [not null]
+  name String [not null]
+  type StepType [not null]
+  lessonId String
+  testId String
+  module modules [not null]
+  lesson lessons
+  test tests
+  progress step_progress [not null]
+
+  indexes {
+    (moduleId, position) [unique]
+  }
+}
+
+Table lessons {
+  id String [pk]
+  name String [not null]
+  content String [not null, default: '']
+  videoId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  steps steps [not null]
+  video files
+}
+
+Table tests {
+  id String [pk]
+  name String [not null]
+  passingPercent Int [not null, default: 80]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  questions test_questions [not null]
+  attempts test_attempts [not null]
+  steps steps [not null]
+}
+
+Table course_questions {
+  id String [pk]
+  question String [not null]
+  courseId String [not null]
+  moduleId String
+  course courses [not null]
+  module modules
+  answers course_answers [not null]
+  testQuestions test_questions [not null]
+  testAttemptAnswers test_attempt_answers [not null]
+}
+
+Table course_answers {
+  id String [pk]
+  answer String [not null]
+  isCorrect Boolean [not null, default: false]
+  questionId String [not null]
+  question course_questions [not null]
+  testAttemptAnswers test_attempt_answers [not null]
+}
+
+Table test_questions {
+  id String [pk]
+  testId String [not null]
+  questionId String [not null]
+  test tests [not null]
+  question course_questions [not null]
+
+  indexes {
+    (testId, questionId) [unique]
+  }
+}
+
+Table test_attempts {
+  id String [pk]
+  testId String [not null]
+  employeeId String [not null]
+  score Int
+  isPassed Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  endedAt DateTime
+  test tests [not null]
+  employee employees [not null]
+  answers test_attempt_answers [not null]
+}
+
+Table test_attempt_answers {
+  id String [pk]
+  option String [not null]
+  attemptId String [not null]
+  questionId String [not null]
+  answerId String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  attempt test_attempts [not null]
+  question course_questions [not null]
+  answer course_answers [not null]
+}
+
+Table course_applications {
+  id String [pk]
+  courseId String [not null]
+  employeeId String [not null]
+  status ApplicationStatus [not null, default: 'PENDING']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  course courses [not null]
+  employee employees [not null]
+
+  indexes {
+    (courseId, employeeId) [unique]
+  }
+}
+
+Table course_enrollments {
+  id String [pk]
+  courseId String [not null]
+  employeeId String [not null]
+  assignedById String
+  currentStepId String
+  status EnrollmentStatus [not null, default: 'IN_PROGRESS']
+  startedAt DateTime [default: `now()`, not null]
+  completedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  course courses [not null]
+  employee employees [not null]
+  assignedBy employees
+  progress step_progress [not null]
+  onboardingStep onboarding_steps
+
+  indexes {
+    (courseId, employeeId) [unique]
+  }
+}
+
+Table step_progress {
+  id String [pk]
+  stepId String [not null]
+  enrollmentId String [not null]
+  completedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  step steps [not null]
+  enrollment course_enrollments [not null]
+
+  indexes {
+    (stepId, enrollmentId) [unique]
+  }
+}
+
+Table onboarding_templates {
+  id String [pk]
+  name String [not null]
+  description String [not null]
+  positionId String [not null]
+  divisionId String [not null]
+  coverId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  position positions [not null]
+  division divisions [not null]
+  cover files
+  steps onboarding_template_steps [not null]
+  onboardings onboardings [not null]
+}
+
+Table onboarding_template_steps {
+  id String [pk]
+  templateId String [not null]
+  position Int [not null]
+  name String [not null]
+  description String [not null]
+  type OnboardingStepType [not null]
+  courseId String
+  recommendedStartOffsetDays Int [not null]
+  recommendedEndOffsetDays Int [not null]
+  coverId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  template onboarding_templates [not null]
+  course courses
+  cover files
+  feedbackOptions onboarding_template_step_feedback_options [not null]
+
+  indexes {
+    (templateId, position) [unique]
+  }
+}
+
+Table onboarding_template_step_feedback_options {
+  id String [pk]
+  stepId String [not null]
+  label String [not null]
+  step onboarding_template_steps [not null]
+}
+
+Table onboardings {
+  id String [pk]
+  name String [not null]
+  description String [not null]
+  templateId String
+  assignedById String [not null]
+  assignedToId String [not null]
+  status OnboardingStatus [not null, default: 'IN_PROGRESS']
+  startDate DateTime [not null]
+  endDate DateTime [not null]
+  completedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  template onboarding_templates
+  assignedBy employees [not null]
+  assignedTo employees [not null]
+  steps onboarding_steps [not null]
+  chat onboarding_chats
+}
+
+Table onboarding_steps {
+  id String [pk]
+  onboardingId String [not null]
+  position Int [not null]
+  name String [not null]
+  description String [not null]
+  type OnboardingStepType [not null]
+  courseId String
+  enrollmentId String [unique]
+  recommendedStartDate DateTime [not null]
+  recommendedEndDate DateTime [not null]
+  feedbackText String
+  completedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  onboarding onboardings [not null]
+  course courses
+  enrollment course_enrollments
+  feedbackOptions onboarding_step_feedback_options [not null]
+  feedbackSelections onboarding_step_feedback_selections [not null]
+
+  indexes {
+    (onboardingId, position) [unique]
+  }
+}
+
+Table onboarding_step_feedback_options {
+  id String [pk]
+  stepId String [not null]
+  label String [not null]
+  step onboarding_steps [not null]
+  selections onboarding_step_feedback_selections [not null]
+}
+
+Table onboarding_step_feedback_selections {
+  stepId String [not null]
+  optionId String [not null]
+  step onboarding_steps [not null]
+  option onboarding_step_feedback_options [not null]
+
+  indexes {
+    (stepId, optionId) [pk]
+  }
+}
+
+Table onboarding_chats {
+  id String [pk]
+  onboardingId String [unique, not null]
+  createdAt DateTime [default: `now()`, not null]
+  onboarding onboardings [not null]
+  messages onboarding_chat_messages [not null]
+}
+
+Table onboarding_chat_messages {
+  id String [pk]
+  chatId String [not null]
+  senderId String [not null]
+  body String [not null]
+  readAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  chat onboarding_chats [not null]
+  sender employees [not null]
+}
+
+Table notifications {
+  id String [pk]
+  userId String [not null]
+  type String [not null]
+  payload Json
+  readAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  user users [not null]
+}
+
+Enum StepType {
+  LESSON
+  TEST
+}
+
+Enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+Enum EnrollmentStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+Enum OnboardingStepType {
+  TEXT
+  COURSE
+}
+
+Enum OnboardingStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+Ref: users.roleId > roles.id [delete: Restrict]
+
+Ref: tokens.userId > users.id [delete: Cascade]
+
+Ref: divisions.departmentId > departments.id
+
+Ref: positions.parentId - positions.id [delete: Set Null]
+
+Ref: employees.id - users.id [delete: Cascade]
+
+Ref: employees.divisionId > divisions.id
+
+Ref: employees.positionId > positions.id
+
+Ref: employees.avatarId > files.id [delete: Set Null]
+
+Ref: courses.authorId > employees.id
+
+Ref: courses.coverId > files.id [delete: Set Null]
+
+Ref: modules.courseId > courses.id [delete: Cascade]
+
+Ref: steps.moduleId > modules.id [delete: Cascade]
+
+Ref: steps.lessonId > lessons.id [delete: Set Null]
+
+Ref: steps.testId > tests.id [delete: Set Null]
+
+Ref: lessons.videoId > files.id [delete: Set Null]
+
+Ref: course_questions.courseId > courses.id [delete: Cascade]
+
+Ref: course_questions.moduleId > modules.id [delete: Set Null]
+
+Ref: course_answers.questionId > course_questions.id [delete: Cascade]
+
+Ref: test_questions.testId > tests.id [delete: Cascade]
+
+Ref: test_questions.questionId > course_questions.id [delete: Cascade]
+
+Ref: test_attempts.testId > tests.id [delete: Cascade]
+
+Ref: test_attempts.employeeId > employees.id
+
+Ref: test_attempt_answers.attemptId > test_attempts.id [delete: Cascade]
+
+Ref: test_attempt_answers.questionId > course_questions.id
+
+Ref: test_attempt_answers.answerId > course_answers.id
+
+Ref: course_applications.courseId > courses.id [delete: Cascade]
+
+Ref: course_applications.employeeId > employees.id [delete: Cascade]
+
+Ref: course_enrollments.courseId > courses.id [delete: Cascade]
+
+Ref: course_enrollments.employeeId > employees.id [delete: Cascade]
+
+Ref: course_enrollments.assignedById > employees.id [delete: Cascade]
+
+Ref: step_progress.stepId > steps.id [delete: Cascade]
+
+Ref: step_progress.enrollmentId > course_enrollments.id [delete: Cascade]
+
+Ref: onboarding_templates.positionId > positions.id
+
+Ref: onboarding_templates.divisionId > divisions.id
+
+Ref: onboarding_templates.coverId > files.id [delete: Set Null]
+
+Ref: onboarding_template_steps.templateId > onboarding_templates.id [delete: Cascade]
+
+Ref: onboarding_template_steps.courseId > courses.id [delete: Set Null]
+
+Ref: onboarding_template_steps.coverId > files.id [delete: Set Null]
+
+Ref: onboarding_template_step_feedback_options.stepId > onboarding_template_steps.id [delete: Cascade]
+
+Ref: onboardings.templateId > onboarding_templates.id [delete: Set Null]
+
+Ref: onboardings.assignedById > employees.id
+
+Ref: onboardings.assignedToId > employees.id
+
+Ref: onboarding_steps.onboardingId > onboardings.id [delete: Cascade]
+
+Ref: onboarding_steps.courseId > courses.id [delete: Set Null]
+
+Ref: onboarding_steps.enrollmentId - course_enrollments.id [delete: Set Null]
+
+Ref: onboarding_step_feedback_options.stepId > onboarding_steps.id [delete: Cascade]
+
+Ref: onboarding_step_feedback_selections.stepId > onboarding_steps.id [delete: Cascade]
+
+Ref: onboarding_step_feedback_selections.optionId > onboarding_step_feedback_options.id [delete: Cascade]
+
+Ref: onboarding_chats.onboardingId - onboardings.id [delete: Cascade]
+
+Ref: onboarding_chat_messages.chatId > onboarding_chats.id [delete: Cascade]
+
+Ref: onboarding_chat_messages.senderId > employees.id
+
+Ref: notifications.userId > users.id [delete: Cascade]

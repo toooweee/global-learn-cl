@@ -8,6 +8,7 @@ import { CourseMapper } from '@/modules/education/course/course.mapper';
 import { COURSE_REPOSITORY } from '@/modules/education/course/application/ports/course.repository.port';
 import { CoursePrismaRepository } from '@/modules/education/course/infra/course-prisma.repository';
 import { CreateCourseCommandHandler } from '@/modules/education/course/application/commands/create-course/create-course.command-handler';
+import { CreateFullCourseCommandHandler } from '@/modules/education/course/application/commands/create-full-course/create-full-course.command-handler';
 import { UpdateCourseCommandHandler } from '@/modules/education/course/application/commands/update-course/update-course.command-handler';
 import { DeleteCourseCommandHandler } from '@/modules/education/course/application/commands/delete-course/delete-course.command-handler';
 import { AddModuleCommandHandler } from '@/modules/education/course/application/commands/add-module/add-module.command-handler';
@@ -16,6 +17,8 @@ import { AddStepCommandHandler } from '@/modules/education/course/application/co
 import { RemoveStepCommandHandler } from '@/modules/education/course/application/commands/remove-step/remove-step.command-handler';
 import { FindCourseQueryHandler } from '@/modules/education/course/application/queries/find-course/find-course.query-handler';
 import { FindCoursesQueryHandler } from '@/modules/education/course/application/queries/find-courses/find-courses.query-handler';
+import { GetCoursesOverviewQueryHandler } from '@/modules/education/course/application/queries/get-courses-overview/get-courses-overview.query-handler';
+import { GetCourseAnalyticsQueryHandler } from '@/modules/education/course/application/queries/get-course-analytics/get-course-analytics.query-handler';
 import { CourseController } from '@/modules/education/course/presentation/course.controller';
 
 // CourseApplication
@@ -97,6 +100,7 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     CourseMapper,
     { provide: COURSE_REPOSITORY, useClass: CoursePrismaRepository },
     CreateCourseCommandHandler,
+    CreateFullCourseCommandHandler,
     UpdateCourseCommandHandler,
     DeleteCourseCommandHandler,
     AddModuleCommandHandler,
@@ -105,6 +109,8 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     RemoveStepCommandHandler,
     FindCourseQueryHandler,
     FindCoursesQueryHandler,
+    GetCoursesOverviewQueryHandler,
+    GetCourseAnalyticsQueryHandler,
 
     // CourseApplication
     CourseApplicationMapper,

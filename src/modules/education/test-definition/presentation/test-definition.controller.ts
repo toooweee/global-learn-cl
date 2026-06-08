@@ -42,7 +42,7 @@ import {
 
 @ApiTags('tests')
 @Controller()
-@Roles('admin', 'manager')
+@Roles('Admin')
 export class TestDefinitionController {
   constructor(
     private readonly commandBus: CommandBus,
@@ -118,7 +118,7 @@ export class TestDefinitionController {
   @ApiOperation({ summary: 'Remove a question from a test' })
   @ApiNoContentResponse()
   removeQuestion(
-    @Param() { id }: IdRequestDto,
+    @Param('id') id: string,
     @Param('questionId') questionId: string,
   ): Promise<void> {
     return this.commandBus.execute(

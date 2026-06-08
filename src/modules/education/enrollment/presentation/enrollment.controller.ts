@@ -47,7 +47,7 @@ export class EnrollmentController {
   ) {}
 
   @Post('courses/:id/enroll')
-  @Roles('admin', 'manager')
+  @Roles('Admin')
   @ApiOperation({ summary: 'Enroll an employee in a course (admin/manager)' })
   @ApiCreatedResponse({ type: IdResponseDto })
   enroll(
@@ -65,7 +65,7 @@ export class EnrollmentController {
   }
 
   @Get('courses/:id/enrollments')
-  @Roles('admin', 'manager')
+  @Roles('Admin')
   @ApiOperation({
     summary: 'List all enrollments for a course (admin/manager)',
   })
@@ -118,7 +118,7 @@ export class EnrollmentController {
   @ApiOperation({ summary: 'Mark a step as started' })
   @ApiNoContentResponse()
   startStep(
-    @Param() { id }: IdRequestDto,
+    @Param('id') id: string,
     @Param('stepId') stepId: string,
   ): Promise<void> {
     return this.commandBus.execute(
@@ -134,7 +134,7 @@ export class EnrollmentController {
   })
   @ApiNoContentResponse()
   completeStep(
-    @Param() { id }: IdRequestDto,
+    @Param('id') id: string,
     @Param('stepId') stepId: string,
   ): Promise<void> {
     return this.commandBus.execute(

@@ -8,6 +8,10 @@ datasource db {
   provider = "postgresql"
 }
 
+generator dbml {
+  provider = "prisma-dbml-generator"
+}
+
 // ============================================================
 // Identity
 // ============================================================
@@ -116,14 +120,14 @@ model Employee {
   position Position? @relation(fields: [positionId], references: [id])
   avatar   File?     @relation("EmployeeAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
 
-  authoredCourses      Course[]                @relation("CourseAuthor")
-  enrollments          CourseEnrollment[]
-  assignedEnrollments  CourseEnrollment[]      @relation("EnrollmentAssignedBy")
-  courseApplications   CourseApplication[]
-  testAttempts         TestAttempt[]
-  onboardingsAssigned  Onboarding[]            @relation("OnboardingAssignedBy")
-  onboardingsReceived  Onboarding[]            @relation("OnboardingAssignedTo")
-  chatMessagesSent     OnboardingChatMessage[] @relation("OnboardingChatMessageSender")
+  authoredCourses     Course[]                @relation("CourseAuthor")
+  enrollments         CourseEnrollment[]
+  assignedEnrollments CourseEnrollment[]      @relation("EnrollmentAssignedBy")
+  courseApplications  CourseApplication[]
+  testAttempts        TestAttempt[]
+  onboardingsAssigned Onboarding[]            @relation("OnboardingAssignedBy")
+  onboardingsReceived Onboarding[]            @relation("OnboardingAssignedTo")
+  chatMessagesSent    OnboardingChatMessage[] @relation("OnboardingChatMessageSender")
 
   @@map("employees")
 }
@@ -359,10 +363,10 @@ model CourseEnrollment {
   createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
-  course       Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  employee     Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  assignedBy   Employee?      @relation("EnrollmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
-  progress     StepProgress[]
+  course         Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee       Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  assignedBy     Employee?       @relation("EnrollmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  progress       StepProgress[]
   onboardingStep OnboardingStep?
 
   @@unique([courseId, employeeId])

@@ -51,7 +51,7 @@ class ListTemplatesQueryDto extends PaginatedQueryRequestDto {
 
 @ApiTags('onboarding-templates')
 @Controller('onboarding/templates')
-@Roles('admin', 'manager')
+@Roles('Admin')
 export class OnboardingTemplateController {
   constructor(
     private readonly commandBus: CommandBus,

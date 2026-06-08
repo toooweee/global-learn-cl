@@ -33,7 +33,10 @@ import { AddStepCommand } from '@/modules/education/course/application/commands/
 import { RemoveStepCommand } from '@/modules/education/course/application/commands/remove-step/remove-step.command';
 import { FindCourseQuery } from '@/modules/education/course/application/queries/find-course/find-course.query';
 import { FindCoursesQuery } from '@/modules/education/course/application/queries/find-courses/find-courses.query';
+import { GetCoursesOverviewQuery } from '@/modules/education/course/application/queries/get-courses-overview/get-courses-overview.query';
+import { GetCourseAnalyticsQuery } from '@/modules/education/course/application/queries/get-course-analytics/get-course-analytics.query';
 import { CreateCourseRequestDto } from './dto/create-course.request.dto';
+import { CreateFullCourseRequestDto } from './dto/create-full-course.request.dto';
 import { UpdateCourseRequestDto } from './dto/update-course.request.dto';
 import { AddModuleRequestDto } from './dto/add-module.request.dto';
 import { AddStepRequestDto } from './dto/add-step.request.dto';
@@ -41,6 +44,11 @@ import {
   CourseResponseDto,
   CourseSummaryResponseDto,
 } from './dto/course.response.dto';
+import {
+  CourseAnalyticsResponseDto,
+  CoursesOverviewItemDto,
+} from './dto/course-analytics.response.dto';
+import { CreateFullCourseCommand } from '@/modules/education/course/application/commands/create-full-course/create-full-course.command';
 
 @ApiTags('courses')
 @Controller('courses')
@@ -51,7 +59,7 @@ export class CourseController {
   ) {}
 
   @Post()
-  @Roles('admin', 'manager')
+  @Roles('Admin')
   @ApiOperation({ summary: 'Create a course' })
   @ApiCreatedResponse({ type: IdResponseDto })
   create(@Body() dto: CreateCourseRequestDto): Promise<IdResponseDto> {
@@ -60,6 +68,23 @@ export class CourseController {
         name: dto.name,
         description: dto.description,
         coverId: dto.coverId,
+      }),
+    );
+  }
+
+  @Post('full')
+  @Roles('Admin')
+  @ApiOperation({
+    summary: 'Create a course with modules and steps atomically',
+  })
+  @ApiCreatedResponse({ type: IdResponseDto })
+  createFull(@Body() dto: CreateFullCourseRequestDto): Promise<IdResponseDto> {
+    return this.commandBus.execute(
+      new CreateFullCourseCommand({
+        name: dto.name,
+        description: dto.description ?? '',
+        coverId: dto.coverId,
+        modules: dto.modules ?? [],
       }),
     );
   }
@@ -75,6 +100,19 @@ export class CourseController {
     );
   }
 
+  @Get('analytics')
+  @ApiOperation({
+    summary: 'Courses enrollment overview (paginated, with completion rates)',
+  })
+  @ApiOkResponse({ type: PaginatedResponseDto })
+  getCoursesOverview(
+    @Query() query: PaginatedQueryRequestDto,
+  ): Promise<PaginatedResponseDto<CoursesOverviewItemDto>> {
+    return this.queryBus.execute(
+      new GetCoursesOverviewQuery({ limit: query.limit, page: query.page }),
+    );
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get course by ID' })
   @ApiOkResponse({ type: CourseResponseDto })
@@ -83,8 +121,21 @@ export class CourseController {
     return this.queryBus.execute(new FindCourseQuery({ courseId: id }));
   }
 
+  @Get(':id/analytics')
+  @ApiOperation({
+    summary:
+      'Course analytics: enrollment stats broken down by division and department',
+  })
+  @ApiOkResponse({ type: CourseAnalyticsResponseDto })
+  @ApiNotFoundResponse()
+  getCourseAnalytics(
+    @Param() { id }: IdRequestDto,
+  ): Promise<CourseAnalyticsResponseDto> {
+    return this.queryBus.execute(new GetCourseAnalyticsQuery({ courseId: id }));
+  }
+
   @Patch(':id')
-  @Roles('admin', 'manager')
+  @Roles('Admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Update course metadata' })
   @ApiNoContentResponse()
@@ -104,7 +155,7 @@ export class CourseController {
   }
 
   @Delete(':id')
-  @Roles('admin', 'manager')
+  @Roles('Admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a course' })
   @ApiNoContentResponse()
@@ -114,7 +165,7 @@ export class CourseController {
   }
 
   @Post(':id/modules')
-  @Roles('admin', 'manager')
+  @Roles('Admin')
   @ApiOperation({ summary: 'Add a module to a course' })
   @ApiCreatedResponse({ type: IdResponseDto })
   @ApiNotFoundResponse()
@@ -128,13 +179,13 @@ export class CourseController {
   }
 
   @Delete(':id/modules/:moduleId')
-  @Roles('admin', 'manager')
+  @Roles('Admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a module from a course' })
   @ApiNoContentResponse()
   @ApiNotFoundResponse()
   removeModule(
-    @Param() { id }: IdRequestDto,
+    @Param('id') id: string,
     @Param('moduleId') moduleId: string,
   ): Promise<void> {
     return this.commandBus.execute(
@@ -143,12 +194,12 @@ export class CourseController {
   }
 
   @Post(':id/modules/:moduleId/steps')
-  @Roles('admin', 'manager')
+  @Roles('Admin')
   @ApiOperation({ summary: 'Add a step to a module' })
   @ApiCreatedResponse({ type: IdResponseDto })
   @ApiNotFoundResponse()
   addStep(
-    @Param() { id }: IdRequestDto,
+    @Param('id') id: string,
     @Param('moduleId') moduleId: string,
     @Body() dto: AddStepRequestDto,
   ): Promise<IdResponseDto> {
@@ -165,13 +216,13 @@ export class CourseController {
   }
 
   @Delete(':id/modules/:moduleId/steps/:stepId')
-  @Roles('admin', 'manager')
+  @Roles('Admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a step from a module' })
   @ApiNoContentResponse()
   @ApiNotFoundResponse()
   removeStep(
-    @Param() { id }: IdRequestDto,
+    @Param('id') id: string,
     @Param('moduleId') moduleId: string,
     @Param('stepId') stepId: string,
   ): Promise<void> {

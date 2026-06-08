@@ -29,7 +29,7 @@ import {
 
 @ApiTags('lessons')
 @Controller('lessons')
-@Roles('admin', 'manager')
+@Roles('Admin')
 export class LessonController {
   constructor(private readonly commandBus: CommandBus) {}
 
