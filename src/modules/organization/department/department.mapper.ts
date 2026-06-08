@@ -15,6 +15,7 @@ export class DepartmentMapper implements Mapper<
       id: record.id,
       props: {
         name: record.name,
+        isActive: record.isActive,
         createdAt: record.createdAt,
         updatedAt: record.updatedAt,
       },
@@ -26,6 +27,7 @@ export class DepartmentMapper implements Mapper<
     return {
       id: props.id,
       name: props.name,
+      isActive: props.isActive,
       createdAt: props.createdAt,
       updatedAt: props.updatedAt,
     };

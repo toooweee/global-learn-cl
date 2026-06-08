@@ -1,0 +1,58 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { BaseResponseDto } from '@/libs/api/dto/base.response.dto';
+
+export class TestAttemptResultDto {
+  @ApiProperty({ example: 8, description: 'Number of correct answers' })
+  correct: number;
+  @ApiProperty({ example: 10, description: 'Total number of questions' })
+  total: number;
+  @ApiProperty({ example: 80, description: 'Score as a percentage' })
+  score: number;
+  @ApiProperty({
+    example: true,
+    description: 'Whether score >= test passingPercent',
+  })
+  isPassed: boolean;
+
+  constructor(props: {
+    correct: number;
+    total: number;
+    score: number;
+    isPassed: boolean;
+  }) {
+    this.correct = props.correct;
+    this.total = props.total;
+    this.score = props.score;
+    this.isPassed = props.isPassed;
+  }
+}
+
+export class TestAttemptResponseDto extends BaseResponseDto {
+  @ApiProperty({ example: '3fa85f64-5717-4562-b3fc-2c963f66afa6' })
+  testId: string;
+  @ApiProperty({ example: '3fa85f64-5717-4562-b3fc-2c963f66afa6' })
+  employeeId: string;
+  @ApiProperty({ example: '2025-01-01T00:00:00.000Z', required: false })
+  endedAt?: string;
+  @ApiProperty({
+    example: 5,
+    description: 'Number of questions answered so far',
+  })
+  answeredCount: number;
+
+  constructor(props: {
+    id: string;
+    createdAt: Date;
+    updatedAt?: Date;
+    testId: string;
+    employeeId: string;
+    endedAt?: Date;
+    answeredCount: number;
+  }) {
+    super(props);
+    this.testId = props.testId;
+    this.employeeId = props.employeeId;
+    this.endedAt = props.endedAt?.toISOString();
+    this.answeredCount = props.answeredCount;
+  }
+}

@@ -16,6 +16,7 @@ export class DivisionMapper implements Mapper<
       props: {
         name: record.name,
         departmentId: record.departmentId,
+        isActive: record.isActive,
         createdAt: record.createdAt,
         updatedAt: record.updatedAt,
       },
@@ -28,6 +29,7 @@ export class DivisionMapper implements Mapper<
       id: props.id,
       name: props.name,
       departmentId: props.departmentId,
+      isActive: props.isActive,
       createdAt: props.createdAt,
       updatedAt: props.updatedAt,
     };

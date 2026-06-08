@@ -15,6 +15,7 @@ export const EnvSchema = z.object({
 
   SMTP_HOST: z.string().default('localhost'),
   SMTP_PORT: z.coerce.number().default(1025),
+  SMTP_FROM: z.string().default('no-reply@globallearn.com'),
 
   TEST_ADMIN_EMAIL: z.string(),
   TEST_ADMIN_PASSWORD: z.string(),

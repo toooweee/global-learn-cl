@@ -14,7 +14,12 @@ export class DepartmentEntity extends Entity<DepartmentProps> {
   static create(props: CreateDepartmentProps) {
     return new DepartmentEntity({
       id: randomUUID(),
-      props: { ...props, createdAt: new Date(), updatedAt: new Date() },
+      props: {
+        ...props,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     });
   }
 

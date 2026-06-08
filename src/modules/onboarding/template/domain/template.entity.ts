@@ -3,6 +3,7 @@ import { AggregateId, CreateEntityProps, Entity } from '@/libs/ddd/entity.base';
 import { DomainException } from '@/libs/ddd/domain.exception';
 import {
   CreateOnboardingTemplateProps,
+  CreateOnboardingTemplateStepProps,
   OnboardingTemplateProps,
   OnboardingTemplateStepProps,
 } from '@/modules/onboarding/template/template.types';
@@ -66,5 +67,45 @@ export class OnboardingTemplateEntity extends Entity<OnboardingTemplateProps> {
     props,
   }: RecreateOnboardingTemplateProps): OnboardingTemplateEntity {
     return new OnboardingTemplateEntity({ id, props });
+  }
+
+  update(props: {
+    name: string;
+    description: string;
+    coverId?: string;
+    steps: CreateOnboardingTemplateStepProps[];
+  }): void {
+    const steps: OnboardingTemplateStepProps[] = props.steps
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map((step) => {
+        if (step.recommendedEndOffsetDays < step.recommendedStartOffsetDays) {
+          throw new DomainException(
+            `Template step "${step.name}": end offset must be >= start offset`,
+            'ONBOARDING_TEMPLATE_STEP_INVALID_OFFSETS',
+          );
+        }
+        return {
+          id: randomUUID(),
+          position: step.position,
+          name: step.name,
+          description: step.description,
+          type: step.type,
+          courseId: step.courseId,
+          recommendedStartOffsetDays: step.recommendedStartOffsetDays,
+          recommendedEndOffsetDays: step.recommendedEndOffsetDays,
+          coverId: step.coverId,
+          feedbackOptions: step.feedbackOptions.map((option) => ({
+            id: randomUUID(),
+            label: option.label,
+          })),
+        };
+      });
+
+    this._props.name = props.name;
+    this._props.description = props.description;
+    this._props.coverId = props.coverId;
+    this._props.steps = steps;
+    this._props.updatedAt = new Date();
   }
 }

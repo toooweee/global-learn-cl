@@ -11,10 +11,15 @@ import { AuthModule } from '@/modules/identity/auth/auth.module';
 import { OrganizationModule } from '@/modules/organization/organization.module';
 import { EmployeeModule } from '@/modules/employee/employee.module';
 import { RoleModule } from '@/modules/identity/role/role.module';
+import { FilesModule } from '@/modules/files/file.module';
+import { EducationModule } from '@/modules/education/education.module';
 import { CqrsModule } from '@nestjs/cqrs';
 import { AllExceptionsFilter } from '@/infra/exception-filters/all-exceptions.filter';
 import { JwtAuthGuard } from '@/libs/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/libs/auth/guards/roles.guard';
+import { GatewayModule } from '@/infra/gateway/gateway.module';
+import { NotificationModule } from '@/modules/notifications/notification.module';
+import { MailModule } from '@/modules/mail/mail.module';
 
 const interceptors: Provider[] = [
   { provide: APP_INTERCEPTOR, useClass: ContextInterceptor },
@@ -41,6 +46,11 @@ const guards: Provider[] = [
     OrganizationModule,
     EmployeeModule,
     OnboardingModule,
+    FilesModule,
+    EducationModule,
+    GatewayModule,
+    NotificationModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [...interceptors, ...exceptionFilters, ...guards],

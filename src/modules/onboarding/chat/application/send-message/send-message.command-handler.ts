@@ -7,6 +7,7 @@ import { ONBOARDING_REPOSITORY } from '@/modules/onboarding/assignment/applicati
 import type { OnboardingRepositoryPort } from '@/modules/onboarding/assignment/application/ports/onboarding.repository.port';
 import { IdResponseDto } from '@/libs/api/dto';
 import { ApplicationException } from '@/libs/application/exceptions/application.exception';
+import { OnboardingChatGateway } from '@/infra/gateway/onboarding-chat.gateway';
 
 @CommandHandler(SendOnboardingChatMessageCommand)
 export class SendOnboardingChatMessageHandler implements ICommandHandler<
@@ -18,42 +19,55 @@ export class SendOnboardingChatMessageHandler implements ICommandHandler<
     private readonly chatRepository: OnboardingChatRepositoryPort,
     @Inject(ONBOARDING_REPOSITORY)
     private readonly onboardingRepository: OnboardingRepositoryPort,
+    private readonly chatGateway: OnboardingChatGateway,
   ) {}
 
   async execute(
     command: SendOnboardingChatMessageCommand,
   ): Promise<IdResponseDto> {
-    return this.chatRepository.transaction(async () => {
-      const onboarding = await this.onboardingRepository.findById(
-        command.onboardingId,
-      );
-      if (onboarding.isNone()) {
-        throw new ApplicationException(
-          'Onboarding not found',
-          404,
-          'ONBOARDING_NOT_FOUND',
+    const { messageId, chatId, messageProps } =
+      await this.chatRepository.transaction(async () => {
+        const onboarding = await this.onboardingRepository.findById(
+          command.onboardingId,
         );
-      }
-      const o = onboarding.unwrap().getProps();
+        if (onboarding.isNone()) {
+          throw new ApplicationException(
+            'Onboarding not found',
+            404,
+            'ONBOARDING_NOT_FOUND',
+          );
+        }
+        const o = onboarding.unwrap().getProps();
 
-      const chat = await this.chatRepository.findByOnboardingId(
-        command.onboardingId,
-      );
-      if (chat.isNone()) {
-        throw new ApplicationException(
-          'Chat not found for this onboarding',
-          404,
-          'ONBOARDING_CHAT_NOT_FOUND',
+        const chat = await this.chatRepository.findByOnboardingId(
+          command.onboardingId,
         );
-      }
-      const c = chat.unwrap();
-      const message = c.postMessage({
-        senderId: command.senderId,
-        body: command.body,
-        allowedSenderIds: [o.assignedById, o.assignedToId],
+        if (chat.isNone()) {
+          throw new ApplicationException(
+            'Chat not found for this onboarding',
+            404,
+            'ONBOARDING_CHAT_NOT_FOUND',
+          );
+        }
+
+        const c = chat.unwrap();
+        const message = c.postMessage({
+          senderId: command.senderId,
+          body: command.body,
+          allowedSenderIds: [o.assignedById, o.assignedToId],
+        });
+        await this.chatRepository.save(c);
+
+        return { messageId: message.id, chatId: c.id, messageProps: message };
       });
-      await this.chatRepository.save(c);
-      return new IdResponseDto(message.id);
+
+    this.chatGateway.sendToChat(chatId, {
+      id: messageProps.id,
+      senderId: messageProps.senderId,
+      body: messageProps.body,
+      createdAt: messageProps.createdAt,
     });
+
+    return new IdResponseDto(messageId);
   }
 }

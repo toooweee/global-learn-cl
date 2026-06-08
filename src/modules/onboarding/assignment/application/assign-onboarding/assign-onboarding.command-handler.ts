@@ -11,6 +11,9 @@ import type { OnboardingChatRepositoryPort } from '@/modules/onboarding/chat/app
 import { OnboardingChatEntity } from '@/modules/onboarding/chat/domain/chat.entity';
 import { IdResponseDto } from '@/libs/api/dto';
 import { ApplicationException } from '@/libs/application/exceptions/application.exception';
+import { PrismaService } from '@/infra/prisma/prisma.service';
+import { NotificationService } from '@/modules/notifications/notification.service';
+import { MailService } from '@/modules/mail/mail.service';
 
 @CommandHandler(AssignOnboardingCommand)
 export class AssignOnboardingHandler implements ICommandHandler<
@@ -24,10 +27,13 @@ export class AssignOnboardingHandler implements ICommandHandler<
     private readonly templateRepository: OnboardingTemplateRepositoryPort,
     @Inject(ONBOARDING_CHAT_REPOSITORY)
     private readonly chatRepository: OnboardingChatRepositoryPort,
+    private readonly prismaService: PrismaService,
+    private readonly notificationService: NotificationService,
+    private readonly mailService: MailService,
   ) {}
 
   async execute(command: AssignOnboardingCommand): Promise<IdResponseDto> {
-    return this.repository.transaction(async () => {
+    const onboardingId = await this.repository.transaction(async () => {
       const template = await this.templateRepository.findById(
         command.templateId,
       );
@@ -54,7 +60,28 @@ export class AssignOnboardingHandler implements ICommandHandler<
         OnboardingChatEntity.create(onboarding.id),
       );
 
-      return new IdResponseDto(onboarding.id);
+      return onboarding.id;
     });
+
+    // employeeId === userId in this schema (shared PK)
+    const userId = command.assignedToId;
+
+    this.notificationService
+      .notify(userId, 'ONBOARDING_ASSIGNED', { onboardingId })
+      .catch(() => undefined);
+
+    this.prismaService.client.user
+      .findUnique({ where: { id: userId }, select: { email: true } })
+      .then((user) => {
+        if (user?.email) {
+          return this.mailService.sendOnboardingAssigned(user.email, {
+            startDate: command.startDate.toISOString().slice(0, 10),
+            endDate: command.endDate.toISOString().slice(0, 10),
+          });
+        }
+      })
+      .catch(() => undefined);
+
+    return new IdResponseDto(onboardingId);
   }
 }

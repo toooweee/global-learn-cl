@@ -58,6 +58,7 @@ model Role {
 model Department {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @unique @db.VarChar(255)
+  isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -69,6 +70,7 @@ model Department {
 model Division {
   id           String   @id @default(uuid()) @db.Uuid
   name         String   @unique @db.VarChar(255)
+  isActive     Boolean  @default(true) @map("is_active")
   departmentId String   @map("department_id") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -100,6 +102,7 @@ model Employee {
   id             String    @id @db.Uuid
   fullname       String    @db.VarChar(255)
   biography      String?   @db.Text
+  birthDate      DateTime? @map("birth_date") @db.Timestamptz
   employmentDate DateTime  @map("employment_date") @db.Timestamptz
   dismissalDate  DateTime? @map("dismissal_date") @db.Timestamptz
   divisionId     String    @map("division_id") @db.Uuid
@@ -113,12 +116,14 @@ model Employee {
   position Position? @relation(fields: [positionId], references: [id])
   avatar   File?     @relation("EmployeeAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
 
-  authoredCourses     Course[]                @relation("CourseAuthor")
-  enrollments         CourseEnrollment[]
-  testAttempts        TestAttempt[]
-  onboardingsAssigned Onboarding[]            @relation("OnboardingAssignedBy")
-  onboardingsReceived Onboarding[]            @relation("OnboardingAssignedTo")
-  chatMessagesSent    OnboardingChatMessage[] @relation("OnboardingChatMessageSender")
+  authoredCourses      Course[]                @relation("CourseAuthor")
+  enrollments          CourseEnrollment[]
+  assignedEnrollments  CourseEnrollment[]      @relation("EnrollmentAssignedBy")
+  courseApplications   CourseApplication[]
+  testAttempts         TestAttempt[]
+  onboardingsAssigned  Onboarding[]            @relation("OnboardingAssignedBy")
+  onboardingsReceived  Onboarding[]            @relation("OnboardingAssignedTo")
+  chatMessagesSent     OnboardingChatMessage[] @relation("OnboardingChatMessageSender")
 
   @@map("employees")
 }
@@ -135,6 +140,7 @@ model File {
   employeeAvatars         Employee[]               @relation("EmployeeAvatar")
   onboardingTemplates     OnboardingTemplate[]     @relation("OnboardingTemplateCover")
   onboardingTemplateSteps OnboardingTemplateStep[] @relation("OnboardingTemplateStepCover")
+  lessonVideos            Lesson[]                 @relation("LessonVideo")
 
   @@map("files")
 }
@@ -157,6 +163,7 @@ model Course {
   modules                 Module[]
   questions               CourseQuestion[]
   enrollments             CourseEnrollment[]
+  applications            CourseApplication[]
   onboardingTemplateSteps OnboardingTemplateStep[]
   onboardingSteps         OnboardingStep[]
 
@@ -205,19 +212,23 @@ model Step {
 model Lesson {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.Text
+  content   String   @default("") @db.Text
+  videoId   String?  @map("video_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   steps Step[]
+  video File?  @relation("LessonVideo", fields: [videoId], references: [id], onDelete: SetNull)
 
   @@map("lessons")
 }
 
 model Test {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String   @db.Text
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String   @db.Text
+  passingPercent Int      @default(80) @map("passing_percent")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   questions TestQuestion[]
   attempts  TestAttempt[]
@@ -269,6 +280,8 @@ model TestAttempt {
   id         String    @id @default(uuid()) @db.Uuid
   testId     String    @map("test_id") @db.Uuid
   employeeId String    @map("employee_id") @db.Uuid
+  score      Int?
+  isPassed   Boolean   @default(false) @map("is_passed")
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
   endedAt    DateTime? @map("ended_at") @db.Timestamptz
 
@@ -296,6 +309,33 @@ model TestAttemptAnswer {
 }
 
 // ============================================================
+// Course applications
+// ============================================================
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("application_status")
+}
+
+model CourseApplication {
+  id         String            @id @default(uuid()) @db.Uuid
+  courseId   String            @map("course_id") @db.Uuid
+  employeeId String            @map("employee_id") @db.Uuid
+  status     ApplicationStatus @default(PENDING)
+  createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, employeeId])
+  @@map("course_applications")
+}
+
+// ============================================================
 // Progress tracking
 // ============================================================
 
@@ -308,18 +348,22 @@ enum EnrollmentStatus {
 }
 
 model CourseEnrollment {
-  id          String           @id @default(uuid()) @db.Uuid
-  courseId    String           @map("course_id") @db.Uuid
-  employeeId  String           @map("employee_id") @db.Uuid
-  status      EnrollmentStatus @default(IN_PROGRESS)
-  startedAt   DateTime         @default(now()) @map("started_at") @db.Timestamptz
-  completedAt DateTime?        @map("completed_at") @db.Timestamptz
-  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+  id            String           @id @default(uuid()) @db.Uuid
+  courseId      String           @map("course_id") @db.Uuid
+  employeeId    String           @map("employee_id") @db.Uuid
+  assignedById  String?          @map("assigned_by_id") @db.Uuid
+  currentStepId String?          @map("current_step_id") @db.Uuid
+  status        EnrollmentStatus @default(IN_PROGRESS)
+  startedAt     DateTime         @default(now()) @map("started_at") @db.Timestamptz
+  completedAt   DateTime?        @map("completed_at") @db.Timestamptz
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
-  course   Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  employee Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  progress StepProgress[]
+  course       Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee     Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  assignedBy   Employee?      @relation("EnrollmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  progress     StepProgress[]
+  onboardingStep OnboardingStep?
 
   @@unique([courseId, employeeId])
   @@map("course_enrollments")
@@ -375,7 +419,6 @@ model OnboardingTemplate {
   steps       OnboardingTemplateStep[]
   onboardings Onboarding[]
 
-  @@unique([positionId, divisionId])
   @@map("onboarding_templates")
 }
 
@@ -444,6 +487,7 @@ model OnboardingStep {
   description          String             @db.Text
   type                 OnboardingStepType
   courseId             String?            @map("course_id") @db.Uuid
+  enrollmentId         String?            @unique @map("enrollment_id") @db.Uuid
   recommendedStartDate DateTime           @map("recommended_start_date") @db.Timestamptz
   recommendedEndDate   DateTime           @map("recommended_end_date") @db.Timestamptz
   feedbackText         String?            @map("feedback_text") @db.Text
@@ -453,6 +497,7 @@ model OnboardingStep {
 
   onboarding         Onboarding                        @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
   course             Course?                           @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  enrollment         CourseEnrollment?                 @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
   feedbackOptions    OnboardingStepFeedbackOption[]
   feedbackSelections OnboardingStepFeedbackSelection[]
 

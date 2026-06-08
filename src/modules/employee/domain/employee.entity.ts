@@ -16,6 +16,7 @@ export class EmployeeEntity extends Entity<EmployeeProps> {
       props: {
         fullname: props.fullname,
         biography: props.biography ?? null,
+        birthDate: props.birthDate ?? null,
         employmentDate: props.employmentDate,
         dismissalDate: props.dismissalDate ?? null,
         divisionId: props.divisionId,

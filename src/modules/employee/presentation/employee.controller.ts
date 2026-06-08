@@ -24,7 +24,6 @@ import { IdRequestDto } from '@/libs/api/dto/id.request.dto';
 import { PaginatedQueryRequestDto } from '@/libs/api/dto/paginated.query.request.dto';
 import { ApiPaginatedResponse } from '@/libs/api/decorators/api-paginated-response.decorator';
 import { Paginated } from '@/libs/application';
-import { Employee } from '@generated/client';
 import { CreateEmployeeRequestDto } from '@/modules/employee/presentation/dto/create-employee.request.dto';
 import { UpdateEmployeeRequestDto } from '@/modules/employee/presentation/dto/update-employee.request.dto';
 import { PromoteEmployeeRequestDto } from '@/modules/employee/presentation/dto/promote-employee.request.dto';
@@ -73,7 +72,7 @@ export class EmployeeController {
   ): Promise<PaginatedResponseDto<EmployeeResponseDto>> {
     const result = await this.queryBus.execute<
       FindEmployeesQuery,
-      Paginated<Employee>
+      Paginated<EmployeeResponseDto>
     >(
       new FindEmployeesQuery({
         limit: query.limit,
@@ -85,7 +84,7 @@ export class EmployeeController {
       count: result.count,
       limit: result.limit,
       page: result.page,
-      data: result.data.map((e) => new EmployeeResponseDto(e)),
+      data: result.data,
     });
   }
 
@@ -95,11 +94,10 @@ export class EmployeeController {
   async getMySubordinates(
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<EmployeeResponseDto[]> {
-    const employees = await this.queryBus.execute<
+    return this.queryBus.execute<
       FindMySubordinatesQuery,
-      Employee[]
+      EmployeeResponseDto[]
     >(new FindMySubordinatesQuery(user.userId));
-    return employees.map((e) => new EmployeeResponseDto(e));
   }
 
   @ApiOperation({ summary: 'Get employee by id' })
@@ -107,10 +105,9 @@ export class EmployeeController {
   @ApiNotFoundResponse()
   @Get(':id')
   async findOne(@Param() params: IdRequestDto): Promise<EmployeeResponseDto> {
-    const record = await this.queryBus.execute<FindEmployeeQuery, Employee>(
+    return this.queryBus.execute<FindEmployeeQuery, EmployeeResponseDto>(
       new FindEmployeeQuery(params.id),
     );
-    return new EmployeeResponseDto(record);
   }
 
   @ApiOperation({ summary: 'Update employee' })

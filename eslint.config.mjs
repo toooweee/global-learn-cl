@@ -30,6 +30,17 @@ export default tseslint.config(
       '@typescript-eslint/no-floating-promises': 'off',
       '@typescript-eslint/no-unsafe-argument': 'warn',
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
+
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+
+      '@typescript-eslint/require-await': 'off',
     },
   },
 );

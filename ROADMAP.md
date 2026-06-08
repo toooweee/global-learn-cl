@@ -3,7 +3,7 @@
 Это план «как достроить приложение». Написан в первую очередь для будущих сессий Claude, поэтому
 пишу плотно, со ссылками на конкретные файлы, и фиксирую решения, которые ещё надо принять.
 
-Состояние на 2026-06-07 (обновлено после Phase 1):
+Состояние на 2026-06-07 (обновлено после Phase 3):
 - БД полностью описана (см. `prisma/schema.prisma`). ⚠ Секция «Database schema» в `CLAUDE.md` устарела (там ещё описаны `clients` / `client_companies` / `user_roles` join + плоский `Position` без иерархии) — поправить при первой удобной правке. Актуальные ключевые отличия от того, что в `CLAUDE.md`:
   - **`Client` / `ClientCompany` удалены** — система чисто B2E (employees only). `Course.author`, enrollment, test attempts, onboarding, chat — всё привязано только к `Employee`.
   - **`Role` теперь many-to-one с `User`** (`User.roleId` FK, `onDelete: Restrict`). Никакой join-таблицы `user_roles` нет. Роли — `Admin`, `Employee` (сидятся через `pnpm prisma db seed`).
@@ -111,53 +111,82 @@
 - [x] `user.repository.port.ts` — `UserRepositoryPort extends RepositoryPort<UserEntity>` + `findByEmail`.
 - [x] `user-prisma.repository.ts` — реализован: `save`, `findById`, `findByEmail`, `delete`. ⚠ Технический долг: внутри используется `this.prismaService.client.user.*` — должен быть `this.db.user.*`, чтобы методы видели активную транзакцию из `RequestContextService`. Поправить при первой правке этого файла.
 - [x] `UserService` — упразднён, заменён на CQRS handlers + репозиторий.
-- [ ] **`DeleteUserCommand`** — есть пустой `delete-user.command.ts`, handler не написан. Доделать.
+- [x] **`DeleteUserCommand`** — handler реализован: загружает entity, вызывает `userRepository.delete(entity)`.
 - [ ] Прочее API через CQRS: `UpdateUserCommand` (email/password — отдельные команды? одна команда с private fields? — решить при добавлении профиля). `FindUserByEmailQuery` понадобится для auth-флоу (вернёт `User` с `role` через `include: { role: true }` — read-side direct-Prisma путь).
 
 ---
 
-## Phase 3 — Files (depends on Phase 1)
+## Phase 3 — Files (depends on Phase 1) ✅
 
-Сейчас в схеме есть `files`, но загрузки никакой.
+Реализовано на 2026-06-07. Решения и факты:
 
-- [ ] Решить **где хранить**: локальный диск (для dev) vs S3-совместимое (MinIO в docker-compose добавить). Рекомендую MinIO — продакшен-реалистично и поднимается рядом с Postgres.
-- [ ] `src/modules/files/` — `UploadFile` use case, контроллер `POST /files` с `multer`, сохранение URL в `files`, выдача presigned-URL для скачивания (если S3).
-- [ ] Декаплинг от модулей: владельцы (course, employee, onboarding) хранят только `file_id`. Cleanup-задача на удаление осиротевших файлов — фаза 7.
-- [ ] Подумать про лимиты размера и MIME-whitelist (картинки vs документы).
+- **Хранилище**: MinIO (S3-совместимое) — уже было поднято в `docker-compose.yaml` + `docker-compose.local.yaml` (порты 9000/9090). Env-переменные `MINIO_ENDPOINT`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_BUCKET_NAME`, `MINIO_REGION` добавлены в `EnvSchema` и `.env.example`.
+- **`src/infra/file/`** (инфра-слой, вынесен пользователем до этой сессии):
+  - `FileModule` — `@Module` с `S3Client` + привязкой `FILE_STORAGE → S3StorageAdapter`. Экспортирует `FILE_STORAGE`.
+  - `S3StorageAdapter` — `upload()` возвращает **публичный URL** (`${endpoint}/${bucket}/${key}`), `delete(publicUrl)` извлекает ключ и удаляет объект, `getSignedUrl(publicUrl)` генерирует presigned GET на 1 час через `@aws-sdk/s3-request-presigner`. При старте (`onModuleInit`) проверяет/создаёт бакет.
+  - `aws-sdk.config.ts` — фабрика `S3Client` с `forcePathStyle: true` (нужно для MinIO).
+- **`src/modules/files/`** (feature-модуль, DDD):
+  - `FileEntity` — `create(props)` / `recreate({id, props})`. Props: `{ url: string }`.
+  - `FileMapper` — реализует полный `Mapper<FileEntity, FileRecord, FileResponseDto>`. `FileRecord` = `import type { File as FileRecord } from '@generated/client'`.
+  - `FilePrismaRepository` — `save`, `findById`, `delete`. Использует `this.db` (transaction-aware).
+  - `UploadFileCommand` / `UploadFileCommandHandler` — принимает `{ buffer, filename, mimeType }`, загружает в S3, создаёт `FileEntity`, сохраняет в `files`. Возвращает `FileResponseDto` с presigned URL.
+  - `DeleteFileCommand` / `DeleteFileCommandHandler` — находит файл, удаляет из S3 и из `files`.
+  - `FileController` — `POST /files` (multer `FileInterceptor`, memory storage, лимит 5 MB, MIME-whitelist: `image/jpeg`, `image/png`, `image/webp`, `image/gif`), `GET /files/:id` (возвращает presigned URL), `DELETE /files/:id`. Swagger-аннотирован.
+  - `FilesModule` — импортирует `FileInfraModule` + `PrismaModule`, экспортирует `FILE_REPOSITORY`.
+- **Декаплинг**: владельцы (`course`, `employee`, `onboarding_template`) хранят только `file_id` FK. Доступ к URL всегда через `GET /files/:id`.
+- **Лимиты**: размер файла 5 MB (multer `limits.fileSize`), MIME-whitelist проверяется в контроллере (бросает `ApplicationException` с кодом `INVALID_FILE_TYPE`).
+- **Tech-debt Phase 7**: cleanup осиротевших файлов при удалении владельца (сейчас FK `ON DELETE SET NULL` — файл остаётся в `files` и в MinIO).
 
 ---
 
 ## Phase 4 — Education (depends on Phase 1 + Phase 3 для обложек)
 
-Каркас:
-- `src/modules/education/course/` — есть `domain/course.entity.ts`, `course.types.ts`, пустые use cases, пустой controller.
-- `src/modules/education/module/` — есть `domain/module.entity.ts`, пустые use cases.
-- `src/modules/education/course-application/` — всё пустое.
-- `src/modules/education/enrollment/` — есть пустые папки.
+### 4.1 Курс как агрегат ✅
 
-### 4.1 Курс как агрегат
+- [x] `CourseEntity` — `create` / `updateMetadata` / `addModule` / `removeModule` / `addStep` / `removeStep` с авто-позиционированием.
+- [x] `CourseMapper` (ToDomain) + `CourseRecord` = `Prisma.CourseGetPayload<{ include: typeof courseInclude }>`.
+- [x] `CoursePrismaRepository` — `save` (upsert + replaceTree modules+steps), `findById`, `findMany`, `delete`.
+- [x] Commands: `create-course`, `update-course`, `delete-course`, `add-module`, `remove-module`, `add-step`, `remove-step`.
+- [x] Queries: `find-course` (by ID, direct Prisma → `CourseResponseDto`), `find-courses` (paginated → `CourseSummaryResponseDto`).
+- [x] `CourseController` — `POST /courses`, `GET /courses`, `GET /courses/:id`, `PATCH /courses/:id`, `DELETE /courses/:id`, `POST /courses/:id/modules`, `DELETE /courses/:id/modules/:moduleId`, `POST /courses/:id/modules/:moduleId/steps`, `DELETE /courses/:id/modules/:moduleId/steps/:stepId`.
 
-Решение: **`Course` — агрегат с детьми Modules→Steps→Lessons/Tests**, как `OnboardingTemplate` со steps. Иначе границы транзакций станут нечёткими.
+### 4.2 Course-application (заявки на курсы) ✅
 
-- [ ] `CourseEntity` — заполнить `create` / `addModule` / `removeModule` / `addStep` / `removeStep`. `getProps()` должен возвращать модули и шаги в плоском виде.
-- [ ] Repository port + Prisma adapter (по образцу `OnboardingTemplatePrismaRepository`, но дерево глубже — modules → steps → lesson/test). Нагрузка на `save` будет ощутимой, можно завести `replaceTreeForCourse(id, …)`-операцию.
-- [ ] Use cases: `create-course`, `update-course` (метаданные), `publish-course` (если будет состояние draft/published — обсудить), `add-module`, `add-step`.
+Сотрудники подают заявки на курсы; менеджеры/admin утверждают или отклоняют. При утверждении автоматически создаётся `CourseEnrollment`.
 
-### 4.2 Course-application (заявки клиентов на курсы)
+- [x] `CourseApplicationEntity` — `create` / `approve` / `reject` с проверкой статуса `PENDING`.
+- [x] `CourseApplicationMapper` (ToDomain).
+- [x] `CourseApplicationPrismaRepository` — `save`, `findById`, `findByCourseAndEmployee`, `findMany`.
+- [x] Commands: `apply-for-course` (employeeId из контекста), `approve-course-application` (→ создаёт `CourseEnrollment`), `reject-course-application`.
+- [x] Queries: `find-applications-for-course` (admin, by courseId), `find-my-applications` (employee, by employeeId из контекста).
+- [x] `CourseApplicationController` — `POST /courses/:id/applications`, `GET /courses/:id/applications`, `PATCH /courses/:id/applications/:appId/approve`, `PATCH /courses/:id/applications/:appId/reject`, `GET /me/applications`.
 
-Это внутренние утверждения. Сотрудники могут проходить только назначенные им курсы. А на остальные нужно подавать заявки.
+### 4.3 Enrollment + StepProgress ✅
 
-### 4.3 Enrollment + StepProgress
+- [x] `EnrollmentEntity` — `create` / `startStep` / `completeStep` / `markCompleted` / `cancel`. `completeStep` авто-проставляет `COMPLETED` на enrollment, когда кол-во выполненных шагов == кол-ву шагов курса.
+- [x] `EnrollmentMapper` (ToDomain) + `enrollmentInclude = { progress: true }`.
+- [x] `EnrollmentPrismaRepository` — `save` (upsert enrollment + upsert каждого StepProgress), `findById`, `findByCourseAndEmployee`, `findMany`.
+- [x] Commands: `create-enrollment` (admin/manager задаёт employeeId), `start-step`, `complete-step` (+ PrismaService для подсчёта шагов курса), `cancel-enrollment`.
+- [x] Queries: `find-enrollment` (with progress), `find-my-enrollments` (paginated, employeeId из контекста).
+- [x] `EnrollmentController` — `POST /courses/:id/enroll`, `GET /me/enrollments`, `GET /enrollments/:id`, `DELETE /enrollments/:id`, `POST /enrollments/:id/steps/:stepId/start`, `POST /enrollments/:id/steps/:stepId/complete`.
 
-- [ ] `EnrollmentEntity` — статусы из `enrollment_status`. Use cases: `enroll`, `start-step`, `complete-step`, `cancel-enrollment`. `complete-step` должен апдейтить `step_progress` и проставлять `completed_at` на enrollment, когда все шаги done.
+### 4.4 Test attempts ✅
 
-### 4.4 Test attempts
+Дизайн-решения (зафиксировано с пользователем): попыток неограниченно, проходной балл 80%, показываем только N/M (без раскрытия правильных/неправильных ответов).
 
-- [ ] `TestAttemptEntity` — `start`, `answer-question`, `finish` (подсчёт результата по `course_answers.is_correct`). Решение нужно: **сколько попыток разрешено, есть ли проходной балл, отображать ли неправильные ответы** — спросить пользователя.
+- [x] `TestAttemptEntity` — `create` / `answerQuestion` (upsert по questionId) / `finish`. Бросает `DomainException` при попытке ответить/завершить уже закрытый attempt.
+- [x] `TestAttemptMapper` (ToDomain) + `testAttemptInclude = { answers: true }`.
+- [x] `TestAttemptPrismaRepository` — `save` (upsert attempt + upsert answers), `findById`.
+- [x] Commands: `start-test-attempt` (employeeId из контекста), `answer-question` (upsert ответа), `finish-test-attempt` (→ `TestAttemptResultDto { correct, total, passed }`; `passed = correct/total >= 0.8`).
+- [x] Query: `find-test-attempt` → `TestAttemptResponseDto` (answeredCount, статус завершения).
+- [x] `TestAttemptController` — `POST /tests/:testId/attempts`, `GET /attempts/:id`, `POST /attempts/:id/answers`, `POST /attempts/:id/finish`.
 
-### 4.5 Lessons / Tests CRUD
+### 4.5 Lessons / Tests CRUD ✅
 
-- [ ] Отдельные модули для CRUD контента уроков и тестов (они переиспользуются через `Step`).
+- [x] **Lesson**: `LessonEntity` (name only), `LessonMapper`, `LessonPrismaRepository`, commands: `create-lesson`, `update-lesson`, `delete-lesson`. `LessonController` — `POST /lessons`, `PATCH /lessons/:id`, `DELETE /lessons/:id`. (Роли: admin/manager.)
+- [x] **TestDefinition** (`Test` в схеме): `TestDefinitionEntity` (name only), `TestDefinitionMapper`, `TestDefinitionPrismaRepository` (+ `addQuestion` / `removeQuestion` через `TestQuestion`). Commands: `create-test-definition`, `update-test-definition`, `delete-test-definition`, `add-question-to-test`, `remove-question-from-test`. Query: `find-test-definition` (with questions + answers).
+- [x] **CourseQuestion** (банк вопросов курса): `CourseQuestionEntity` (question + `CourseAnswer[]`), `CourseQuestionPrismaRepository` (save replaces answers). Commands: `create-course-question` (question + answers[]), `delete-course-question`. Query: `find-course-questions` (by courseId).
+- [x] `TestDefinitionController` — `POST/GET/PATCH/DELETE /test-definitions/:id`, `POST/DELETE /test-definitions/:id/questions/:questionId`, `POST /courses/:id/questions`, `GET /courses/:id/questions`, `DELETE /questions/:id`.
 
 ---
 
@@ -165,62 +194,59 @@
 
 Что уже есть (write-сторона): создание шаблона, назначение, complete-step, отправка сообщения в чат. Что недоделано:
 
-### 5.1 Write-сторона — оставшиеся команды
+### 5.1 Write-сторона — оставшиеся команды ✅
 
-- [ ] `UpdateOnboardingTemplate` use case. Сейчас `save()` в `OnboardingTemplatePrismaRepository` умеет апдейтить только метаданные — нет логики diff-а шагов и опций (см. строки 40–60). Подход: при апдейте `replaceSteps` — снести и создать заново внутри транзакции. Шаги шаблона можно безопасно пересоздавать: они НЕ ссылаются на работающие назначения (там материализованные snapshot-копии).
-- [ ] `CancelOnboarding` use case — метод в entity уже есть (`OnboardingEntity.cancel()`), дёрнуть из handler.
-- [ ] `MarkMessagesRead` use case — проставить `read_at` на сообщениях, пришедших до cursor-а и не от текущего пользователя.
+- [x] `UpdateOnboardingTemplate` — `OnboardingTemplateEntity.update()` + repo `save()` делает `deleteMany steps` → `createMany` в одной `upsert`. `PUT /onboarding/templates/:id`.
+- [x] `CancelOnboarding` — вызывает `entity.cancel()` + save. `POST /onboardings/:id/cancel` (204).
+- [x] `MarkChatMessagesRead` — updateMany по `chatId`, `senderId != readerId`, `readAt IS NULL`. `POST /onboardings/:id/chat/messages/read` (204).
 
-### 5.2 Read-сторона — query handlers + GET endpoints
-
-Паттерн: query handlers инжектят `PrismaService` напрямую (как в `FindUserQueryHandler`) и возвращают сырые Prisma-записи или DTO. Включают данные через те же `*Include` константы из мапперов, чтобы типы совпадали.
+### 5.2 Read-сторона — query handlers + GET endpoints ✅
 
 **Onboarding template:**
-- [ ] `GetOnboardingTemplateByIdQuery` + handler → `GET /onboarding/templates/:id` → `OnboardingTemplateResponseDto` (новый, в `template/presentation/dto/`). Включает шаги и feedback-опции.
-- [ ] `ListOnboardingTemplatesQuery` (`PaginatedQuery`) + handler → `GET /onboarding/templates?limit&page` → `PaginatedResponseDto<OnboardingTemplateSummaryResponseDto>` (без шагов, для списка). Фильтры: `?positionId`, `?divisionId`.
+- [x] `GetOnboardingTemplateQuery` → `GET /onboarding/templates/:id` → `OnboardingTemplateResponseDto` (шаги + feedback-опции).
+- [x] `ListOnboardingTemplatesQuery` (`PaginatedQuery`) → `GET /onboarding/templates?limit&page&positionId&divisionId` → `Paginated<OnboardingTemplateSummaryResponseDto>`.
 
 **Onboarding assignment:**
-- [ ] `GetOnboardingByIdQuery` + handler → `GET /onboardings/:id` → `OnboardingResponseDto` (с шагами + статусами завершения + feedback-опциями). 403 если запрашивает не `assignedBy`/`assignedTo`/admin.
-- [ ] `ListMyOnboardingsQuery` (для сотрудника, `assignedToId = currentUser`) + handler → `GET /onboardings/mine`. Возвращает summary без шагов.
-- [ ] `ListAssignedByMeQuery` (для руководителя, `assignedById = currentUser`) + handler → `GET /onboardings/assigned-by-me`. Фильтр `?status=IN_PROGRESS|COMPLETED|CANCELLED`.
-- [ ] `ListMySubordinatesOnboardingsQuery` — «вижу онбординги моих подчинённых». «Подчинённый» = `Employee` с `position.parent.id` где-то в цепочке моей `positionId` (см. Phase 2.1 — рекурсивный поиск). Фильтр `?status=`. Решить (см. Open Questions): только прямые подчинённые или вся ветка вниз.
-- [ ] Репозиторий: метод `findByAssignee` уже есть, добавить `findByAssigner` и `findManyPaginated` под фильтры.
+- [x] `GetOnboardingQuery` → `GET /onboardings/:id` → `OnboardingResponseDto` (шаги + статусы + selections).
+- [x] `ListMyOnboardingsQuery` → `GET /onboardings/mine` → `OnboardingSummaryResponseDto[]`.
+- [x] `ListAssignedByMeQuery` → `GET /onboardings/assigned-by-me` → `OnboardingSummaryResponseDto[]`.
+- [ ] `ListMySubordinatesOnboardingsQuery` — онбординги подчинённых (рекурсивный поиск по иерархии должностей). Tech-debt.
 
 **Onboarding chat:**
-- [ ] `ListChatMessagesQuery` (cursor-based pagination: `?before=<msgId>&limit=`) + handler → `GET /onboardings/:onboardingId/chat/messages`. Возвращает `{messages: OnboardingChatMessageResponseDto[], nextCursor: string | null}`. 403 для не-участников чата.
+- [x] `ListChatMessagesQuery` (cursor-based: `?before=<msgId>&limit=`) → `GET /onboardings/:id/chat/messages` → `ChatMessagesPageResponseDto { messages, nextCursor }`.
 
-**Response DTOs (новые, в `libs/api/dto/` если переиспользуются, иначе в `presentation/dto/<thing>.response.dto.ts`):**
-- [ ] `OnboardingTemplateResponseDto` (полный), `OnboardingTemplateSummaryResponseDto` (для списка).
-- [ ] `OnboardingResponseDto` (полный с шагами), `OnboardingSummaryResponseDto`.
-- [ ] `OnboardingStepResponseDto`, `OnboardingChatMessageResponseDto`.
-
-Все extend-ить от `BaseResponseDto` (id + createdAt + updatedAt). После реализации обновить мапперы: к существующим `ToDomain` добавить `ToResponse` и `implements Mapper<Entity, DbRecord, ResponseDto>` (полный интерфейс, как в `UserMapper`).
+**Response DTOs:**
+- [x] `OnboardingTemplateResponseDto`, `OnboardingTemplateSummaryResponseDto`.
+- [x] `OnboardingResponseDto`, `OnboardingSummaryResponseDto`, `OnboardingStepResponseDto`.
+- [x] `OnboardingChatMessageResponseDto`, `ChatMessagesPageResponseDto`.
 
 ### 5.3 Hooks из других модулей
 
-- [ ] **Авто-назначение при создании Employee и при `promote-employee`**: после фазы 2 — `CreateEmployeeHandler` смотрит, есть ли шаблон для `(positionId, divisionId)`, и если есть — назначает онбординг автоматически. Дату конца брать из шаблона (добавить поле `defaultDurationDays` в `OnboardingTemplate` — мини-миграция).
-- [ ] **Notification on assignment**: после фазы 6 — событие `OnboardingAssigned` → push в `notifications` + email через MailHog.
+- [ ] **Авто-назначение при создании Employee**: `CreateEmployeeHandler` проверяет шаблон для `(positionId, divisionId)` и назначает онбординг. Требует `defaultDurationDays` в `OnboardingTemplate` (мини-миграция).
+- [x] **Notification + mail on assignment**: реализовано в фазе 6 — `AssignOnboardingHandler` → `NotificationService.notify()` + `MailService.sendOnboardingAssigned()`.
 
 ---
 
-## Phase 6 — Realtime, Notifications, Mail
+## Phase 6 — Realtime, Notifications, Mail ✅
 
-### 6.1 Notifications
+### 6.1 Notifications ✅
 
-- [ ] `src/modules/notifications/` — entity `NotificationEntity`, репозиторий, use cases `CreateNotification`, `MarkRead`, `MarkAllRead`. Контроллер: `GET /notifications`, `POST /notifications/:id/read`.
-- [ ] Решение: «отправка» — синхронно из command-handler или через outbox/события? Минимальный вариант — синхронно. Лучше — **outbox-таблица** (`outbox_events`), фоновый воркер на BullMQ читает и публикует. Заведу пока без BullMQ, отметить как tech-debt.
+- [x] `src/modules/notifications/` — `NotificationService` (create, markRead, markAllRead, findByUser via PrismaService напрямую). Контроллер: `GET /me/notifications`, `POST /me/notifications/:id/read`, `POST /me/notifications/read-all`. Синхронная доставка — tech-debt: outbox/BullMQ.
+- [x] `NotificationModule` экспортирует `NotificationService`; импортируется в `OnboardingModule` и `EducationModule`.
 
-### 6.2 WebSocket gateway (чат + push)
+### 6.2 WebSocket gateway (чат + push) ✅
 
-- [ ] `@nestjs/websockets` + `socket.io` — пока нет в deps.
-- [ ] `OnboardingChatGateway` — комната = `chat:{chatId}`, только участники могут подписаться (использовать `JwtAuthGuard` для ws). Эмитить `message:created` после `SendOnboardingChatMessageHandler.execute`. **Подход:** handler возвращает событие, контроллер вызывает gateway. Либо завести легковесный EventBus (Nest умеет через `@nestjs/cqrs` `EventBus`, ирония — он же в deps лежит без дела).
-- [ ] `NotificationsGateway` — комната = `user:{userId}`, эмитить `notification:created`.
+- [x] `@nestjs/websockets` + `@nestjs/platform-socket.io` + `socket.io` добавлены в deps.
+- [x] `src/infra/gateway/gateway.module.ts` — `@Global()` `GatewayModule` экспортирует оба гейтвея.
+- [x] `NotificationsGateway` (namespace `/notifications`) — JWT auth на connect, комната `user:{userId}`, метод `sendToUser(userId, event, data)`.
+- [x] `OnboardingChatGateway` (namespace `/chat`) — JWT auth на connect, клиент подписывается через событие `subscribe({ chatId })`, метод `sendToChat(chatId, message)`. Вызывается из `SendOnboardingChatMessageHandler` после сохранения.
 
-### 6.3 Mail (MailHog уже поднят на 1025/8025)
+### 6.3 Mail (MailHog уже поднят на 1025/8025) ✅
 
-- [ ] `nodemailer` в deps.
-- [ ] `src/modules/mail/` — `MailService.send(template, to, vars)`. Шаблоны — handlebars или просто `.ts` функции. Для dev указывать `SMTP_HOST=localhost SMTP_PORT=1025`.
-- [ ] Триггеры: приглашение сотрудника, назначение онбординга, новая запись на курс, сброс пароля.
+- [x] `nodemailer` + `@types/nodemailer` добавлены в deps.
+- [x] `src/modules/mail/mail.service.ts` — `MailService` с `onModuleInit` транспортом; шаблоны: `sendOnboardingAssigned`, `sendCourseEnrollmentApproved`, `sendEmployeeInvite`.
+- [x] `SMTP_FROM` добавлен в `EnvSchema` и `.env.example`.
+- [x] Триггеры: назначение онбординга (`AssignOnboardingHandler`) → уведомление + письмо; одобрение заявки на курс (`ApproveCourseApplicationCommandHandler`) → уведомление + письмо.
 
 ---
 
@@ -256,15 +282,15 @@
 Не браться, пока не спросим:
 
 1. **`Course` — агрегат целиком или отдельные модули с собственными агрегатами?** Я склоняюсь к «агрегат целиком», но это влияет на 5+ файлов в фазе 4.
-2. **`course_applications` — что это за сущность теперь, без клиентов?** В схеме таблицы нет, но есть папка `src/modules/education/course-application/`. Раньше это мыслилось как «заявка клиента на курс» (b2c), но клиенты убраны. Варианты: (a) удалить папку, (b) переосмыслить как «заявка сотрудника на самозапись на курс с апрувом руководителя».
+2. **`course_applications` — что это за сущность теперь, без клиентов?** Это «заявка сотрудника на прохождения курса на курс с апрувом руководителя».
 3. **Сколько попыток теста разрешено, есть ли проходной балл?** Влияет на `TestAttempt` use cases.
-4. **Удаление сотрудника = soft (`dismissalDate`) или hard?** Я записал soft, подтвердить.
-5. **Файлы — MinIO/S3 или локальный диск?** Сильно влияет на сложность фазы 3.
+4. **Удаление сотрудника = soft решили, с указанием даты увольнения.
+5. **Файлы — MinIO/S3 или локальный диск?** Сильно влияет на сложность фазы 3 - Уже сделали Minio.
 6. **Outbox/события или синхронные нотификации?** Tech-долг vs сложность с самого начала.
 7. **Авто-назначение онбординга при создании Employee — желательно?** Если да — нужно поле `defaultDurationDays` в `OnboardingTemplate`.
-8. **`Position.parent` иерархия — глубина выборки подчинённых?** Когда руководитель смотрит «мои подчинённые» (Phase 2.2) и «онбординги моих подчинённых» (Phase 5.2): возвращаем только прямых (1 уровень вниз) или всю ветку рекурсивно через `WITH RECURSIVE`? Решение влияет на сложность read-side и UX.
+8. **`Position.parent` иерархия — глубина выборки подчинённых?** Когда руководитель смотрит «мои подчинённые» (Phase 2.2) и «онбординги моих подчинённых» (Phase 5.2): возвращаем только прямых (1 уровень вниз) или всю ветку рекурсивно через `WITH RECURSIVE`? Решение влияет на сложность read-side и UX. Я думаю надо рекурсивно делать.
 9. **Можно ли менять `User.roleId` после создания?** Если да — нужен `ChangeUserRoleCommand` (роль уходит в JWT, значит после смены роли нужно инвалидировать токены пользователя — `deleteMany tokens by userId`).
-10. **`Position.parentId` при удалении родителя — `SetNull` подходит?** Сейчас в схеме именно так: подчинённые «отвязываются». Альтернатива — переподвесить их на parent удаляемого. Для корпсистемы скорее всего `SetNull` норм (HR потом руками настроит), подтвердить.
+10. **`Position.parentId` при удалении родителя — `SetNull` подходит?** Сейчас в схеме именно так: подчинённые «отвязываются». Альтернатива — переподвесить их на parent удаляемого. Для корпсистемы скорее всего `SetNull` норм (HR потом руками настроит), подтвердить. Норм
 
 ---
 
@@ -277,3 +303,61 @@
 5. Phase 4 (Education) — самая объёмная, начинать после Phase 2.
 6. Phase 6 (Realtime/Mail) — когда фронт начнёт просить.
 7. Phase 7 — параллельно всему, минимум — тесты на domain после каждой фазы.
+
+## Правки
+
+Выполни задачу строго по следующим шагам. Соблюдай архитектурный стиль приложения, с которым мы идем. 
+
+### ШАГ 1. Изменения в файле prisma.schema
+
+1.1 Модуль обучения и контента:
+- В модель `Lesson` добавь поле контента `content String @db.Text @default("")`.
+- В модель `Lesson` добавь опциональное поле `videoId String? @db.Uuid @map("video_id")`. Свяжи его с моделью `File` (в модели `File` добавь обратное поле `lessonVideos Lesson[] @relation("LessonVideo")`, поведение `onDelete: SetNull`).
+- В модель `Test` добавь поле `passingPercent Int @default(80) @map("passing_percent")`.
+- В модель `TestAttempt` добавь поля денормализованных результатов: `score Int?` (набранный процент/балл) и `isPassed Boolean @default(false) @map("is_passed")`.
+
+1.2 Прогресс и Онбординг:
+- В модель `CourseEnrollment` добавь опциональное поле `currentStepId String? @db.Uuid @map("current_step_id")` для трекинга последнего открытого шага.
+- В модель `CourseEnrollment` добавь историю назначения: `assignedById String? @db.Uuid @map("assigned_by_id")`. Создай связь `assignedBy Employee? @relation("EnrollmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)`. (В модель `Employee` добавь обратное поле `assignedEnrollments CourseEnrollment[] @relation("EnrollmentAssignedBy")`).
+- В модель `OnboardingStep` добавь опциональное уникальное поле зачисления для синхронизации прогресса: `enrollmentId String? @db.Uuid @unique @map("enrollment_id")`. Свяжи его с моделью `CourseEnrollment` (в `CourseEnrollment` добавь обратное поле `onboardingStep OnboardingStep?`, поведение `onDelete: SetNull`).
+- В модели `OnboardingTemplate` УДАЛИ строку ограничения `@@unique([positionId, divisionId])` — теперь шаблонов на одну должность может быть несколько.
+
+1.3 Организационная структура:
+- В модель `Employee` добавь поле `birthDate DateTime? @map("birth_date") @db.Timestamptz`.
+- В модели `Department` и `Division` добавь флаги мягкого скрытия: `isActive Boolean @default(true) @map("is_active")`.
+
+После изменения схемы запусти валидацию и генерацию клиента: `pnpm prisma generate`. Миграции на мне.
+
+---
+
+### ШАГ 2. Модификация существующих API и DTO ✅
+
+2.1 Эндпоинты уроков и курсов: ✅
+- `POST /lessons` → принимает `{ name, content? }`. `PATCH /lessons/{id}` → `{ name?, content? }`.
+- `GET /courses/{id}` → `lessonContent` возвращается внутри `StepResponseDto` (join через `courseInclude`).
+
+2.2 Управление тестами: ✅
+- `POST /test-definitions` → принимает `{ name, passingPercent? }` (дефолт 80). `GET /test-definitions/{id}` → `passingPercent` в ответе.
+- `POST /attempts/{id}/finish` → использует динамический `test.passingPercent` из БД, сохраняет `score` и `isPassed` на `TestAttempt`.
+
+2.3 Назначение курсов и Статистика: ✅
+- `POST /courses/{id}/enroll` → сохраняет `assignedById` из `@CurrentUser()`. Возвращается в `EnrollmentResponseDto`.
+- `GET /courses/{id}/enrollments` → пагинированный список зачислений (новый query `FindEnrollmentsForCourseQuery`).
+- `GET /courses/{id}/applications` → добавлен query-фильтр `?status=PENDING|APPROVED|REJECTED`.
+
+2.4 Обогащение EmployeeResponseDto: ✅
+- `GET /employees` и `GET /employees/{id}` → возвращают `email`, `role: { id, name }`, `department: { id, name }` через include.
+- `EmployeeMapper.toResponse` удалён (query handlers строят DTO напрямую с joined данными).
+
+2.5 Оптимизация авторизации: ✅
+- `GET /auth/me/profile` — возвращает полный профиль за один запрос: user, role, employee (fullname, bio, dates, avatar), division (name), department (id, name), position (id, name).
+
+---
+
+### ШАГ 3. Реализация новых GET-эндпоинтов для Онбординга ✅
+
+1. `GET /onboarding/templates` — ✅ `ListOnboardingTemplatesQuery` (PaginatedQuery, фильтры `positionId`, `divisionId`).
+2. `GET /onboarding/templates/{id}` — ✅ `GetOnboardingTemplateQuery` (шаги + feedbackOptions).
+3. `GET /onboardings` — ✅ `ListOnboardingsQuery` — новый unified endpoint с фильтрами `?assignedToId`, `?assignedById`, `?status` + пагинация. Прежние `/mine` и `/assigned-by-me` сохранены.
+4. `GET /onboardings/{id}` — ✅ `GetOnboardingQuery` (шаги + feedbackSelections).
+5. `GET /onboardings/{onboardingId}/chat/messages` — ✅ `ListChatMessagesQuery` (cursor-based: `?before&limit`).

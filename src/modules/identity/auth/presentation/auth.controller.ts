@@ -9,7 +9,9 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { GetMeQuery } from '@/modules/identity/auth/application/queries/get-me/get-me.query';
+import { GetMyProfileQuery } from '@/modules/identity/auth/application/queries/get-my-profile/get-my-profile.query';
 import { MeResponseDto } from '@/modules/identity/auth/presentation/dto/me.response.dto';
+import { MyProfileResponseDto } from '@/modules/identity/auth/presentation/dto/my-profile.response.dto';
 import type { Request, Response } from 'express';
 import { Public } from '@/libs/auth/decorators/public.decorator';
 import { Roles } from '@/libs/auth/decorators/roles.decorator';
@@ -46,6 +48,20 @@ export class AuthController {
   async me(@CurrentUser() user: CurrentUserPayload): Promise<MeResponseDto> {
     return this.queryBus.execute<GetMeQuery, MeResponseDto>(
       new GetMeQuery(user.userId),
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      'Get full profile of current user (user + role + employee + division + department + position)',
+  })
+  @ApiOkResponse({ type: MyProfileResponseDto })
+  @Get('me/profile')
+  async myProfile(
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<MyProfileResponseDto> {
+    return this.queryBus.execute<GetMyProfileQuery, MyProfileResponseDto>(
+      new GetMyProfileQuery(user.userId),
     );
   }
 

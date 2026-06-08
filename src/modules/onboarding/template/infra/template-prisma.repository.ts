@@ -25,12 +25,35 @@ export class OnboardingTemplatePrismaRepository
   async save(template: OnboardingTemplateEntity): Promise<void> {
     const props = template.getProps();
 
+    const stepCreate = props.steps.map((step) => ({
+      id: step.id,
+      position: step.position,
+      name: step.name,
+      description: step.description,
+      type: step.type,
+      courseId: step.courseId ?? null,
+      recommendedStartOffsetDays: step.recommendedStartOffsetDays,
+      recommendedEndOffsetDays: step.recommendedEndOffsetDays,
+      coverId: step.coverId ?? null,
+      feedbackOptions: {
+        create: step.feedbackOptions.map((option) => ({
+          id: option.id,
+          label: option.label,
+        })),
+      },
+    }));
+
     await this.db.onboardingTemplate.upsert({
       where: { id: template.id },
       update: {
         name: props.name,
         description: props.description,
         coverId: props.coverId ?? null,
+        updatedAt: props.updatedAt ?? new Date(),
+        steps: {
+          deleteMany: {},
+          create: stepCreate,
+        },
       },
       create: {
         id: template.id,
@@ -40,25 +63,7 @@ export class OnboardingTemplatePrismaRepository
         divisionId: props.divisionId,
         coverId: props.coverId ?? null,
         createdAt: props.createdAt,
-        steps: {
-          create: props.steps.map((step) => ({
-            id: step.id,
-            position: step.position,
-            name: step.name,
-            description: step.description,
-            type: step.type,
-            courseId: step.courseId ?? null,
-            recommendedStartOffsetDays: step.recommendedStartOffsetDays,
-            recommendedEndOffsetDays: step.recommendedEndOffsetDays,
-            coverId: step.coverId ?? null,
-            feedbackOptions: {
-              create: step.feedbackOptions.map((option) => ({
-                id: option.id,
-                label: option.label,
-              })),
-            },
-          })),
-        },
+        steps: { create: stepCreate },
       },
     });
   }
@@ -75,8 +80,8 @@ export class OnboardingTemplatePrismaRepository
     positionId: AggregateId,
     divisionId: AggregateId,
   ): Promise<Option<OnboardingTemplateEntity>> {
-    const row = await this.db.onboardingTemplate.findUnique({
-      where: { positionId_divisionId: { positionId, divisionId } },
+    const row = await this.db.onboardingTemplate.findFirst({
+      where: { positionId, divisionId },
       include: onboardingTemplateInclude,
     });
     return row ? Some(this.mapper.toDomain(row)) : None;

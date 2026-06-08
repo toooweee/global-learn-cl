@@ -3,16 +3,19 @@ import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadBucketCommand,
   CreateBucketCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { EnvService } from '@/infra/env/env.service';
 import { FileStoragePort } from '@/libs/application/ports/file-storage.port';
 
 @Injectable()
 export class S3StorageAdapter implements FileStoragePort, OnModuleInit {
   private readonly bucketName: string;
+  private readonly endpoint: string;
   private readonly logger = new Logger(S3StorageAdapter.name);
 
   constructor(
@@ -20,6 +23,7 @@ export class S3StorageAdapter implements FileStoragePort, OnModuleInit {
     private readonly envService: EnvService,
   ) {
     this.bucketName = this.envService.get('MINIO_BUCKET_NAME');
+    this.endpoint = this.envService.get('MINIO_ENDPOINT');
   }
 
   async onModuleInit() {
@@ -79,15 +83,31 @@ export class S3StorageAdapter implements FileStoragePort, OnModuleInit {
         ContentType: mimeType,
       }),
     );
-    return fileKey;
+    return this.buildPublicUrl(fileKey);
   }
 
-  async delete(fileKey: string): Promise<void> {
+  async delete(publicUrl: string): Promise<void> {
+    const fileKey = this.extractKey(publicUrl);
     await this.s3Client.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucketName,
-        Key: fileKey,
-      }),
+      new DeleteObjectCommand({ Bucket: this.bucketName, Key: fileKey }),
     );
+  }
+
+  async getSignedUrl(publicUrl: string): Promise<string> {
+    const fileKey = this.extractKey(publicUrl);
+    return getSignedUrl(
+      this.s3Client,
+      new GetObjectCommand({ Bucket: this.bucketName, Key: fileKey }),
+      { expiresIn: 3600 },
+    );
+  }
+
+  private buildPublicUrl(key: string): string {
+    return `${this.endpoint}/${this.bucketName}/${key}`;
+  }
+
+  private extractKey(publicUrl: string): string {
+    const prefix = `${this.endpoint}/${this.bucketName}/`;
+    return publicUrl.replace(prefix, '');
   }
 }

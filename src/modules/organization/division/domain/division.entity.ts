@@ -14,7 +14,12 @@ export class DivisionEntity extends Entity<DivisionProps> {
   static create(props: CreateDivisionProps) {
     return new DivisionEntity({
       id: randomUUID(),
-      props: { ...props, createdAt: new Date(), updatedAt: new Date() },
+      props: {
+        ...props,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     });
   }
 
