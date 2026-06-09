@@ -54,6 +54,7 @@ import { StartTestAttemptCommandHandler } from '@/modules/education/test-attempt
 import { AnswerQuestionCommandHandler } from '@/modules/education/test-attempt/application/commands/answer-question/answer-question.command-handler';
 import { FinishTestAttemptCommandHandler } from '@/modules/education/test-attempt/application/commands/finish-test-attempt/finish-test-attempt.command-handler';
 import { FindTestAttemptQueryHandler } from '@/modules/education/test-attempt/application/queries/find-test-attempt/find-test-attempt.query-handler';
+import { FindTestAttemptsQueryHandler } from '@/modules/education/test-attempt/application/queries/find-test-attempts/find-test-attempts.query-handler';
 import { TestAttemptController } from '@/modules/education/test-attempt/presentation/test-attempt.controller';
 
 // Lesson
@@ -84,8 +85,14 @@ import { RemoveQuestionFromTestCommandHandler } from '@/modules/education/test-d
 import { CreateCourseQuestionCommandHandler } from '@/modules/education/test-definition/application/commands/create-course-question/create-course-question.command-handler';
 import { UpdateCourseQuestionCommandHandler } from '@/modules/education/test-definition/application/commands/update-course-question/update-course-question.command-handler';
 import { DeleteCourseQuestionCommandHandler } from '@/modules/education/test-definition/application/commands/delete-course-question/delete-course-question.command-handler';
+import { BulkAddQuestionsToTestCommandHandler } from '@/modules/education/test-definition/application/commands/bulk-add-questions-to-test/bulk-add-questions-to-test.command-handler';
+import { GenerateTestFromBankCommandHandler } from '@/modules/education/test-definition/application/commands/generate-test-from-bank/generate-test-from-bank.command-handler';
+import { GenerateCourseTestCommandHandler } from '@/modules/education/test-definition/application/commands/generate-course-test/generate-course-test.command-handler';
+import { GenerateModuleTestCommandHandler } from '@/modules/education/test-definition/application/commands/generate-module-test/generate-module-test.command-handler';
 import { FindTestDefinitionQueryHandler } from '@/modules/education/test-definition/application/queries/find-test-definition/find-test-definition.query-handler';
 import { FindCourseQuestionsQueryHandler } from '@/modules/education/test-definition/application/queries/find-course-questions/find-course-questions.query-handler';
+import { FindCourseQuestionQueryHandler } from '@/modules/education/test-definition/application/queries/find-course-question/find-course-question.query-handler';
+import { GetQuestionBankStatsQueryHandler } from '@/modules/education/test-definition/application/queries/get-question-bank-stats/get-question-bank-stats.query-handler';
 import { TestDefinitionController } from '@/modules/education/test-definition/presentation/test-definition.controller';
 
 @Module({
@@ -146,6 +153,7 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     AnswerQuestionCommandHandler,
     FinishTestAttemptCommandHandler,
     FindTestAttemptQueryHandler,
+    FindTestAttemptsQueryHandler,
 
     // Lesson
     LessonMapper,
@@ -170,11 +178,17 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     DeleteTestDefinitionCommandHandler,
     AddQuestionToTestCommandHandler,
     RemoveQuestionFromTestCommandHandler,
+    BulkAddQuestionsToTestCommandHandler,
+    GenerateTestFromBankCommandHandler,
+    GenerateCourseTestCommandHandler,
+    GenerateModuleTestCommandHandler,
     CreateCourseQuestionCommandHandler,
     UpdateCourseQuestionCommandHandler,
     DeleteCourseQuestionCommandHandler,
     FindTestDefinitionQueryHandler,
     FindCourseQuestionsQueryHandler,
+    FindCourseQuestionQueryHandler,
+    GetQuestionBankStatsQueryHandler,
   ],
 })
 export class EducationModule {}

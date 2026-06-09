@@ -25,7 +25,7 @@ export class OnboardingTemplateMapper implements ToDomain<
       props: {
         name: row.name,
         description: row.description,
-        positionId: row.positionId,
+        positionId: row.positionId ?? undefined,
         divisionId: row.divisionId,
         coverId: row.coverId ?? undefined,
         createdAt: row.createdAt,

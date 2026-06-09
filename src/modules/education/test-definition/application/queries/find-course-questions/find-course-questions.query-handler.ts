@@ -13,9 +13,15 @@ export class FindCourseQuestionsQueryHandler implements IQueryHandler<
   async execute(
     query: FindCourseQuestionsQuery,
   ): Promise<CourseQuestionResponseDto[]> {
+    const where: Record<string, unknown> = { courseId: query.courseId };
+    if (query.moduleId) where.moduleId = query.moduleId;
+
     const rows = await this.prismaService.client.courseQuestion.findMany({
-      where: { courseId: query.courseId },
-      include: { answers: true },
+      where,
+      include: {
+        answers: true,
+        _count: { select: { testQuestions: true } },
+      },
       orderBy: { id: 'asc' },
     });
 
@@ -26,6 +32,7 @@ export class FindCourseQuestionsQueryHandler implements IQueryHandler<
           question: row.question,
           courseId: row.courseId,
           moduleId: row.moduleId,
+          usedInTestsCount: row._count.testQuestions,
           answers: row.answers.map((a) => ({
             id: a.id,
             answer: a.answer,

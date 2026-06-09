@@ -80,8 +80,9 @@ export class CreateOnboardingTemplateRequestDto {
   @IsString()
   description!: string;
 
+  @IsOptional()
   @IsUUID()
-  positionId!: string;
+  positionId?: string;
 
   @IsUUID()
   divisionId!: string;

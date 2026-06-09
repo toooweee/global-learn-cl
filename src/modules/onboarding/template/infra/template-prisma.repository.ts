@@ -59,7 +59,7 @@ export class OnboardingTemplatePrismaRepository
         id: template.id,
         name: props.name,
         description: props.description,
-        positionId: props.positionId,
+        positionId: props.positionId ?? null,
         divisionId: props.divisionId,
         coverId: props.coverId ?? null,
         createdAt: props.createdAt,
@@ -77,11 +77,11 @@ export class OnboardingTemplatePrismaRepository
   }
 
   async findForRole(
-    positionId: AggregateId,
+    positionId: string | null,
     divisionId: AggregateId,
   ): Promise<Option<OnboardingTemplateEntity>> {
     const row = await this.db.onboardingTemplate.findFirst({
-      where: { positionId, divisionId },
+      where: { positionId: positionId ?? null, divisionId },
       include: onboardingTemplateInclude,
     });
     return row ? Some(this.mapper.toDomain(row)) : None;

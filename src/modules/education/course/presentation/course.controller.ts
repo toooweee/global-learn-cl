@@ -51,6 +51,11 @@ import {
 } from './dto/course-analytics.response.dto';
 import { CreateFullCourseCommand } from '@/modules/education/course/application/commands/create-full-course/create-full-course.command';
 import { ArchiveCourseCommand } from '@/modules/education/course/application/commands/archive-course/archive-course.command';
+import { GenerateCourseTestCommand } from '@/modules/education/test-definition/application/commands/generate-course-test/generate-course-test.command';
+import { GenerateModuleTestCommand } from '@/modules/education/test-definition/application/commands/generate-module-test/generate-module-test.command';
+import { GenerateFinalTestRequestDto } from '@/modules/education/test-definition/presentation/dto/test-definition.request.dto';
+import { FindCourseQuestionsQuery } from '@/modules/education/test-definition/application/queries/find-course-questions/find-course-questions.query';
+import { CourseQuestionResponseDto } from '@/modules/education/test-definition/presentation/dto/test-definition.response.dto';
 
 @ApiTags('courses')
 @Controller('courses')
@@ -274,6 +279,67 @@ export class CourseController {
   ): Promise<void> {
     return this.commandBus.execute(
       new RemoveStepCommand({ courseId: id, moduleId, stepId }),
+    );
+  }
+
+  @Post(':id/generate-test')
+  @Roles('Admin')
+  @ApiOperation({
+    summary:
+      'Create a final test for the whole course from its question bank. Name: "Итоговый тест по {courseName}". Returns the new test ID.',
+  })
+  @ApiCreatedResponse({ type: IdResponseDto })
+  @ApiNotFoundResponse()
+  generateCourseTest(
+    @Param() { id }: IdRequestDto,
+    @Body() dto: GenerateFinalTestRequestDto,
+  ): Promise<IdResponseDto> {
+    return this.commandBus.execute(
+      new GenerateCourseTestCommand({
+        courseId: id,
+        count: dto.count,
+        passingPercent: dto.passingPercent,
+      }),
+    );
+  }
+
+  @Post(':id/modules/:moduleId/generate-test')
+  @Roles('Admin')
+  @ApiOperation({
+    summary:
+      'Create a final test for a single module from its question bank. Name: "Итоговый тест по модулю {moduleName}". Returns the new test ID.',
+  })
+  @ApiCreatedResponse({ type: IdResponseDto })
+  @ApiNotFoundResponse()
+  generateModuleTest(
+    @Param('id') id: string,
+    @Param('moduleId') moduleId: string,
+    @Body() dto: GenerateFinalTestRequestDto,
+  ): Promise<IdResponseDto> {
+    return this.commandBus.execute(
+      new GenerateModuleTestCommand({
+        courseId: id,
+        moduleId,
+        count: dto.count,
+        passingPercent: dto.passingPercent,
+      }),
+    );
+  }
+
+  @Get(':id/modules/:moduleId/questions')
+  @Roles('Admin')
+  @ApiOperation({
+    summary:
+      'List question bank for a specific module (subset of the course bank)',
+  })
+  @ApiOkResponse({ type: [CourseQuestionResponseDto] })
+  @ApiNotFoundResponse()
+  findModuleQuestions(
+    @Param('id') id: string,
+    @Param('moduleId') moduleId: string,
+  ): Promise<CourseQuestionResponseDto[]> {
+    return this.queryBus.execute(
+      new FindCourseQuestionsQuery({ courseId: id, moduleId }),
     );
   }
 }

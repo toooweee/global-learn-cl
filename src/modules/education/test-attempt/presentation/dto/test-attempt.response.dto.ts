@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BaseResponseDto } from '@/libs/api/dto/base.response.dto';
 
 export class TestAttemptResultDto {
@@ -24,6 +24,30 @@ export class TestAttemptResultDto {
     this.total = props.total;
     this.score = props.score;
     this.isPassed = props.isPassed;
+  }
+}
+
+export class TestAttemptSummaryDto extends BaseResponseDto {
+  @ApiProperty() testId: string;
+  @ApiProperty() isFinished: boolean;
+  @ApiPropertyOptional() endedAt?: string;
+  @ApiPropertyOptional() score?: number;
+  @ApiPropertyOptional() isPassed?: boolean;
+
+  constructor(props: {
+    id: string;
+    createdAt: Date;
+    testId: string;
+    endedAt: Date | null;
+    score: number | null;
+    isPassed: boolean | null;
+  }) {
+    super(props);
+    this.testId = props.testId;
+    this.isFinished = !!props.endedAt;
+    this.endedAt = props.endedAt?.toISOString();
+    this.score = props.score ?? undefined;
+    this.isPassed = props.isPassed ?? undefined;
   }
 }
 

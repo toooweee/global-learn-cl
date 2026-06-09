@@ -67,8 +67,8 @@ export class OnboardingTemplateResponseDto extends BaseResponseDto {
   name: string;
   @ApiProperty({ example: 'Программа адаптации' })
   description: string;
-  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
-  positionId: string;
+  @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  positionId?: string;
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   divisionId: string;
   @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440000' })
@@ -80,7 +80,7 @@ export class OnboardingTemplateResponseDto extends BaseResponseDto {
     id: string;
     name: string;
     description: string;
-    positionId: string;
+    positionId?: string | null;
     divisionId: string;
     coverId?: string | null;
     steps: ConstructorParameters<typeof OnboardingTemplateStepResponseDto>[0][];
@@ -94,7 +94,7 @@ export class OnboardingTemplateResponseDto extends BaseResponseDto {
     });
     this.name = props.name;
     this.description = props.description;
-    this.positionId = props.positionId;
+    this.positionId = props.positionId ?? undefined;
     this.divisionId = props.divisionId;
     this.coverId = props.coverId ?? undefined;
     this.steps = props.steps.map(
@@ -108,8 +108,8 @@ export class OnboardingTemplateSummaryResponseDto extends BaseResponseDto {
   name: string;
   @ApiProperty({ example: 'Программа адаптации' })
   description: string;
-  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
-  positionId: string;
+  @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  positionId?: string;
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   divisionId: string;
   @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440000' })
@@ -121,7 +121,7 @@ export class OnboardingTemplateSummaryResponseDto extends BaseResponseDto {
     id: string;
     name: string;
     description: string;
-    positionId: string;
+    positionId?: string | null;
     divisionId: string;
     coverId: string | null;
     stepCount: number;
@@ -135,7 +135,7 @@ export class OnboardingTemplateSummaryResponseDto extends BaseResponseDto {
     });
     this.name = props.name;
     this.description = props.description;
-    this.positionId = props.positionId;
+    this.positionId = props.positionId ?? undefined;
     this.divisionId = props.divisionId;
     this.coverId = props.coverId ?? undefined;
     this.stepCount = props.stepCount;

@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BaseResponseDto } from '@/libs/api/dto/base.response.dto';
 
 export class CourseAnswerResponseDto {
@@ -18,11 +18,13 @@ export class CourseQuestionResponseDto {
   @ApiProperty({ example: 'What is NestJS?' }) question: string;
   @ApiProperty({ example: '3fa85f64-5717-4562-b3fc-2c963f66afa6' })
   courseId: string;
-  @ApiProperty({
-    example: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-    required: false,
-  })
+  @ApiPropertyOptional({ example: '3fa85f64-5717-4562-b3fc-2c963f66afa6' })
   moduleId?: string;
+  @ApiProperty({
+    example: 2,
+    description: 'Number of tests that include this question',
+  })
+  usedInTestsCount: number;
   @ApiProperty({ type: [CourseAnswerResponseDto] })
   answers: CourseAnswerResponseDto[];
 
@@ -31,13 +33,46 @@ export class CourseQuestionResponseDto {
     question: string;
     courseId: string;
     moduleId?: string | null;
+    usedInTestsCount?: number;
     answers: { id: string; answer: string; isCorrect: boolean }[];
   }) {
     this.id = props.id;
     this.question = props.question;
     this.courseId = props.courseId;
     this.moduleId = props.moduleId ?? undefined;
+    this.usedInTestsCount = props.usedInTestsCount ?? 0;
     this.answers = props.answers.map((a) => new CourseAnswerResponseDto(a));
+  }
+}
+
+export class QuestionBankModuleStatDto {
+  @ApiPropertyOptional({ nullable: true }) moduleId: string | null;
+  @ApiProperty() count: number;
+
+  constructor(props: { moduleId: string | null; count: number }) {
+    this.moduleId = props.moduleId;
+    this.count = props.count;
+  }
+}
+
+export class QuestionBankStatsDto {
+  @ApiProperty() total: number;
+  @ApiProperty({ description: 'Questions used in at least one test' })
+  usedInTests: number;
+  @ApiProperty({ description: 'Questions not assigned to any test' })
+  unused: number;
+  @ApiProperty({ type: [QuestionBankModuleStatDto] })
+  byModule: QuestionBankModuleStatDto[];
+
+  constructor(props: {
+    total: number;
+    usedInTests: number;
+    byModule: { moduleId: string | null; count: number }[];
+  }) {
+    this.total = props.total;
+    this.usedInTests = props.usedInTests;
+    this.unused = props.total - props.usedInTests;
+    this.byModule = props.byModule.map((m) => new QuestionBankModuleStatDto(m));
   }
 }
 

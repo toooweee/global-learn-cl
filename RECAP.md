@@ -20,24 +20,24 @@
 | Роль | Кто | Что может |
 |------|-----|-----------|
 | **Admin** | HR-менеджер, руководитель | Управляет справочниками (департаменты, отделы, должности), создаёт/редактирует/архивирует курсы, записывает сотрудников, одобряет заявки, управляет онбординг-шаблонами, назначает онбординги, просматривает аналитику, редактирует любой профиль |
-| **Employee** | Рядовой сотрудник | Просматривает курсы, подаёт заявки на курсы, проходит курсы (start/complete step), проходит тесты, участвует в своём онбординге, пишет в чат, редактирует только свой профиль |
+| **Employee** | Рядовой сотрудник | Просматривает курсы, подаёт заявки, проходит курсы и тесты, участвует в онбординге, пишет в чат, редактирует только свой профиль |
 
-> Роль `Admin` создаётся через `POST /roles` и назначается при регистрации (`POST /auth/register`). Система не ограничивает количество ролей в словаре, но на один аккаунт — одна роль.
+> Роль `Admin` создаётся через `POST /roles` и назначается при регистрации (`POST /auth/register`). На один аккаунт — одна роль.
 
 ---
 
 ## Как работает авторизация
 
-1. Регистрация сотрудника — только Admin: `POST /auth/register` → создаёт User + Employee + привязывает роль. Сотрудник получает email-инвайт, затем устанавливает пароль через `POST /auth/complete-registration`.
+1. Регистрация — только Admin: `POST /auth/register` → создаёт User + Employee + роль. Сотрудник получает email-инвайт, затем устанавливает пароль через `POST /auth/complete-registration`.
 2. Вход: `POST /auth/login` → JWT Access Token (cookie `access_token`) + Refresh Token (cookie `refresh_token`, хранится в Redis).
-3. Все эндпоинты защищены `JwtAuthGuard` (глобально). Эндпоинты с `@Public()` доступны без токена.
+3. Все эндпоинты защищены `JwtAuthGuard` глобально. Эндпоинты с `@Public()` доступны без токена.
 4. Обновление токена: `POST /auth/refresh` (по refresh-cookie).
 5. Выход: `POST /auth/logout` — удаляет refresh-сессию, чистит cookies.
 6. Смена пароля: `POST /auth/change-password` — инвалидирует все сессии.
 
 ---
 
-## Реализованные модули (100%)
+## Реализованные модули
 
 ### Identity — Аутентификация и пользователи
 
@@ -51,54 +51,43 @@
 - `GET /auth/me` — текущий пользователь (id, email, роль)
 - `GET /auth/me/profile` — полный профиль (user + role + employee + division + department + position)
 
-**User** `GET /user/*` _(legacy)_
-- `POST /user` — создать user напрямую (без Employee, без роли — **не использовать**, оставлен для инфраструктурных нужд)
-- `GET /user` — список users (пагинация)
-- `GET /user/:id` — user по ID
+**User** `GET /user/*` _(legacy, не использовать в продакшн)_
+- `POST /user` — создать user напрямую (без Employee, без роли)
+- `GET /user` / `GET /user/:id` — список и поиск
 
-**Role** `GET/POST/DELETE /roles/*`
+**Role** `/roles`
 - `POST /roles` — создать роль (Admin)
-- `GET /roles` — список ролей (пагинация)
-- `GET /roles/:id` — роль по ID
-- `DELETE /roles/:id` — удалить роль (Admin)
+- `GET /roles` — список (пагинация)
+- `GET /roles/:id` / `DELETE /roles/:id`
 
 ---
 
 ### Organization — Организационная структура
 
-**Department** `GET/POST/PATCH/DELETE /departments/*`
-- CRUD: создать, обновить, удалить, получить по ID, список (пагинация)
-- Уникальны по имени
-
-**Division** `GET/POST/PATCH/DELETE /divisions/*`
-- CRUD: создать (с `departmentId`), обновить, удалить, получить по ID, список (пагинация, фильтр по `departmentId`)
-
-**Position** `GET/POST/PATCH/DELETE /positions/*`
-- CRUD: создать (с опциональным `parentId`), обновить, удалить, получить по ID, список (пагинация)
-- `GET /positions/tree` — иерархическое дерево должностей
+**Department** `/departments` — CRUD, уникальны по имени  
+**Division** `/divisions` — CRUD, фильтр по `departmentId`  
+**Position** `/positions` — CRUD + `GET /positions/tree` (иерархическое дерево)
 
 ---
 
 ### Employee — Сотрудники
 
-`GET/POST/PATCH/DELETE /employees/*`
-- `POST /employees` — создать (Admin: создаёт User + Employee + привязка роли, деления, должности)
+- `POST /employees` — создать (Admin: User + Employee + роль + division + position)
 - `GET /employees` — список (пагинация, фильтры: `divisionId`, `departmentId`, `roleId`)
 - `GET /employees/:id` — профиль сотрудника
-- `PATCH /employees/:id` — обновить (fullname, biography, divisionId, positionId, avatarId); **только сам сотрудник или Admin**
-- `PATCH /employees/:id/promote` — повысить (сменить positionId, Admin)
-- `DELETE /employees/:id` — уволить (мягкое удаление, Admin)
-- `GET /employees/me/subordinates` — мои прямые подчинённые
+- `PATCH /employees/:id` — обновить (fullname, biography, divisionId, positionId, **avatarId**); **только сам или Admin**
+- `PATCH /employees/:id/promote` — сменить должность (Admin)
+- `DELETE /employees/:id` — уволить, мягкое удаление (Admin)
+- `GET /employees/me/subordinates` — прямые подчинённые
 
-**Аватарка:** загружается через `POST /files` → получаем `fileId` → передаём как `avatarId` в `PATCH /employees/:id`. Поле `avatarId` возвращается в ответе.
+**Аватарка:** `POST /files` → получить `fileId` → передать как `avatarId` в `PATCH /employees/:id`.
 
 ---
 
 ### Files — Файлы и медиа
 
-`GET/POST/DELETE /files/*`
-- `POST /files` — загрузить файл (multipart/form-data, только изображения: jpeg/png/webp/gif, макс 5 МБ) → сохраняет в MinIO/S3
-- `GET /files/:id` — получить presigned URL для просмотра
+- `POST /files` — загрузить (multipart/form-data; только jpeg/png/webp/gif; макс 5 МБ) → MinIO/S3
+- `GET /files/:id` — presigned URL для просмотра
 - `DELETE /files/:id` — удалить файл
 
 ---
@@ -107,70 +96,86 @@
 
 #### Course — Курсы
 
-`GET/POST/PATCH/DELETE /courses/*`
-
-- `POST /courses` — создать курс (Admin, с областью: `scope=ALL|DEPARTMENT|DIVISION`)
+- `POST /courses` — создать курс (Admin; `scope=ALL|DEPARTMENT|DIVISION`)
 - `POST /courses/full` — создать курс с модулями и шагами атомарно (Admin)
-- `GET /courses` — список курсов (пагинация, фильтры: `scope`, `departmentId`, `divisionId`, `visibleToMe`, `includeArchived`) + прогресс текущего пользователя в каждом курсе
-- `GET /courses/:id` — детальная карточка курса (все модули, шаги, isCompleted per step, enrollment progress)
-- `PATCH /courses/:id` — обновить метаданные курса (Admin)
-- `DELETE /courses/:id` — удалить курс (Admin)
-- `PATCH /courses/:id/archive` — архивировать курс (Admin, скрывает из листингов)
-- `PATCH /courses/:id/unarchive` — разархивировать курс (Admin)
-- `POST /courses/:id/modules` — добавить модуль (Admin)
-- `DELETE /courses/:id/modules/:moduleId` — удалить модуль (Admin)
-- `POST /courses/:id/modules/:moduleId/steps` — добавить шаг (Admin)
-- `DELETE /courses/:id/modules/:moduleId/steps/:stepId` — удалить шаг (Admin)
-- `GET /courses/analytics` — обзор всех курсов: enrollment stats (inProgress/completed/cancelled) — пагинация
+- `GET /courses` — список (пагинация; фильтры: `scope`, `departmentId`, `divisionId`, `visibleToMe`, `includeArchived`); включает enrollment-прогресс текущего пользователя
+- `GET /courses/:id` — детальная карточка; ответ содержит: `isArchived`, `author {id, fullname, avatarId}`, `scopeInfo`, `modules[].steps[]` (с `lessonName`, `lessonContent`, `testName`, `testPassingPercent`, `isCompleted`), `totalSteps`, `completedSteps`, `enrollment {status, startedAt, completedAt, completionRate}`
+- `PATCH /courses/:id` — обновить метаданные (Admin)
+- `DELETE /courses/:id` — удалить (Admin)
+- `PATCH /courses/:id/archive` / `PATCH /courses/:id/unarchive` — архивирование (Admin); архивные курсы скрыты из `GET /courses` по умолчанию; запись на архивный курс заблокирована
+- `GET /courses/analytics` — обзор всех курсов: enrollment stats — пагинация
 - `GET /courses/:id/analytics` — аналитика по курсу: разбивка по department и division
 
-**Область видимости курса (scope):**
-- `ALL` — курс доступен всем сотрудникам
-- `DEPARTMENT` — курс для всех сотрудников департамента (требует `departmentId`)
-- `DIVISION` — курс для конкретного отдела (требует `divisionId`)
+**Генерация итоговых тестов:**
+- `POST /courses/:id/generate-test` — создать итоговый тест по курсу из банка вопросов; имя: `"Итоговый тест по {courseName}"`; тело: `{ count?, passingPercent? }` (count опционален — по умолчанию все вопросы); возвращает ID нового теста (Admin)
+- `POST /courses/:id/modules/:moduleId/generate-test` — создать итоговый тест по модулю; имя: `"Итоговый тест по модулю {moduleName}"`; то же тело (Admin)
 
-**Фильтр `visibleToMe=true`:** определяет division/department текущего пользователя и возвращает курсы, доступные ему по scope (`ALL` + курсы своего department + курсы своего division).
+**Управление структурой (Admin):**
+- `POST /courses/:id/modules` / `DELETE /courses/:id/modules/:moduleId`
+- `POST /courses/:id/modules/:moduleId/steps` / `DELETE .../steps/:stepId`
 
-**Архивирование:** Флаг `isArchived` на курсе. `GET /courses` по умолчанию скрывает архивные (передайте `includeArchived=true` чтобы включить). Запись на архивный курс заблокирована.
+**Область видимости (scope):**
+- `ALL` — всем сотрудникам
+- `DEPARTMENT` — сотрудникам указанного департамента
+- `DIVISION` — сотрудникам конкретного отдела
 
-> В `GET /courses` и `GET /courses/:id` автоматически подтягивается enrollment-прогресс текущего авторизованного пользователя: `completedSteps / totalSteps`, `completionRate`, `status`.
+**Фильтр `visibleToMe=true`:** возвращает только курсы, доступные текущему пользователю по его division/department.
+
+---
 
 #### Course Question Bank — Банк вопросов курса
 
-- `POST /courses/:id/questions` — создать вопрос с ответами для банка курса (Admin)
-- `GET /courses/:id/questions` — список вопросов курса (Admin)
-- `PATCH /questions/:id` — обновить вопрос и/или ответы (Admin; при обновлении ответов все старые заменяются новыми)
-- `DELETE /questions/:id` — удалить вопрос (Admin, каскадно удаляет ответы и ссылки из тестов)
+Вопросы привязаны к курсу и опционально к модулю (`moduleId`). Из банка формируются тесты.
+
+- `POST /courses/:id/questions` — создать вопрос с ответами (Admin); `moduleId` — опционально
+- `GET /courses/:id/questions` — полный банк курса (Admin); опциональный фильтр `?moduleId=`; каждый вопрос содержит `usedInTestsCount`
+- `GET /courses/:id/modules/:moduleId/questions` — банк вопросов конкретного модуля (Admin); эквивалент `?moduleId=` с явным URL
+- `GET /courses/:id/questions/stats` — статистика банка: `total`, `usedInTests`, `unused`, `byModule[]`
+- `GET /questions/:id` — один вопрос по ID (с `usedInTestsCount`)
+- `PATCH /questions/:id` — обновить текст и/или ответы (все ответы пересоздаются)
+- `DELETE /questions/:id` — удалить (каскадно удаляет ответы и ссылки из тестов)
+
+---
 
 #### Lesson — Уроки
 
-`GET/POST/PATCH/DELETE /lessons/*`
-- `POST /lessons` — создать урок (name + content в markdown/html) — Admin
+- `POST /lessons` — создать урок (name + content) — Admin
 - `GET /lessons/:id` — получить урок по ID (любой авторизованный)
-- `PATCH /lessons/:id` — обновить урок — Admin
-- `DELETE /lessons/:id` — удалить урок — Admin
+- `PATCH /lessons/:id` — обновить — Admin
+- `DELETE /lessons/:id` — удалить — Admin
+
+---
 
 #### Test Definition — Тесты (определение)
 
-`POST/GET/PATCH/DELETE /test-definitions/*` (Admin only)
-- `POST /test-definitions` — создать тест (name, passingPercent)
+Тест — набор вопросов из банка курса с порогом прохождения (`passingPercent`).
+
+- `POST /test-definitions` — создать тест (Admin)
 - `GET /test-definitions/:id` — тест с вопросами
-- `PATCH /test-definitions/:id` — обновить тест
-- `DELETE /test-definitions/:id` — удалить тест
-- `POST /test-definitions/:id/questions` — добавить вопрос из банка курса в тест
-- `DELETE /test-definitions/:id/questions/:questionId` — убрать вопрос из теста
+- `PATCH /test-definitions/:id` — обновить name / passingPercent
+- `DELETE /test-definitions/:id` — удалить
+
+**Управление вопросами в тесте (Admin):**
+- `POST /test-definitions/:id/questions` — добавить один вопрос из банка
+- `POST /test-definitions/:id/questions/bulk` — добавить несколько сразу (`{ questionIds[] }`; идемпотентно)
+- `DELETE /test-definitions/:id/questions/:questionId` — убрать вопрос
+- `POST /test-definitions/:id/generate` — заменить все вопросы теста случайной выборкой из банка (`{ courseId, count, moduleId? }`)
+
+---
 
 #### Test Attempt — Прохождение тестов
 
-`POST/GET /tests/:testId/attempts`, `/attempts/*`
-- `POST /tests/:testId/attempts` — начать попытку (блокирует старт, если уже есть активная незавершённая попытка)
+- `POST /tests/:testId/attempts` — начать попытку; если уже есть активная (незавершённая) — **возвращает её ID** (resume), новую не создаёт
+- `GET /tests/:testId/attempts` — история попыток текущего пользователя по данному тесту (новые сначала; содержит `isFinished`, `score`, `isPassed`)
 - `GET /attempts/:id` — статус попытки (вопросы + текущие ответы)
-- `POST /attempts/:id/answers` — ответить на вопрос (submit/update answer)
+- `POST /attempts/:id/answers` — ответить на вопрос (submit/update)
 - `POST /attempts/:id/finish` → `{ correct, total, score, isPassed }` — завершить и получить результат
+
+---
 
 #### Enrollment — Записи на курс
 
-- `POST /courses/:id/enroll` — записать сотрудника (Admin, body: `employeeId`); проверяет scope доступа
+- `POST /courses/:id/enroll` — записать сотрудника (Admin, body: `employeeId`); проверяет scope доступа; если статус `CANCELLED` — реактивирует запись
 - `GET /courses/:id/enrollments` — все записи курса (Admin, пагинация)
 - `GET /me/enrollments` — мои записи (пагинация)
 - `GET /enrollments/:id` — детальная запись со step progress
@@ -178,13 +183,13 @@
 - `POST /enrollments/:id/steps/:stepId/start` — начать шаг
 - `POST /enrollments/:id/steps/:stepId/complete` — завершить шаг (автоматически завершает enrollment, если все шаги выполнены)
 
-**Re-enrollment:** Если у сотрудника есть запись со статусом `CANCELLED`, повторный `POST /courses/:id/enroll` очищает прогресс и реактивирует запись (сбрасывает статус в `IN_PROGRESS`).
+---
 
 #### Course Application — Заявки на курс
 
 - `POST /courses/:id/applications` — подать заявку (любой сотрудник)
 - `GET /courses/:id/applications` — список заявок (Admin, фильтр по `status`)
-- `PATCH /courses/:id/applications/:appId/approve` — одобрить (Admin) → автоматически создаёт enrollment + уведомление + email
+- `PATCH /courses/:id/applications/:appId/approve` — одобрить (Admin) → enrollment + уведомление + email
 - `PATCH /courses/:id/applications/:appId/reject` — отклонить (Admin)
 - `GET /me/applications` — мои заявки (пагинация)
 
@@ -192,125 +197,74 @@
 
 ### Onboarding — Онбординг
 
-#### Template — Шаблоны онбординга
+#### Template — Шаблоны
 
-`GET/POST/PUT /onboarding/templates/*` (Admin only)
-- `POST /onboarding/templates` — создать шаблон (привязывается к `positionId` + `divisionId`, уникальный)
-- `GET /onboarding/templates` — список шаблонов (фильтры: `positionId`, `divisionId`)
+- `POST /onboarding/templates` — создать (Admin); `divisionId` обязателен, `positionId` — **опционально**; если `positionId` не указан — шаблон действует для всего отдела без привязки к должности
+- `GET /onboarding/templates` — список (фильтры: `positionId`, `divisionId`)
 - `GET /onboarding/templates/:id` — шаблон с шагами и feedback-опциями
-- `PUT /onboarding/templates/:id` — полное обновление шаблона (шаги пересоздаются)
+- `PUT /onboarding/templates/:id` — полное обновление (шаги пересоздаются)
 
-**Шаг шаблона:**
-- Тип `TEXT` или `COURSE`
-- `recommendedStartOffsetDays` / `recommendedEndOffsetDays` — смещение в днях от даты старта онбординга
-- Feedback-опции — предопределённые варианты выполнения шага (чекбоксы)
+Уникальность: одна пара `(positionId, divisionId)` — один шаблон; при `positionId = null` — один дивизионный шаблон для отдела.
+
+Шаг: тип `TEXT` или `COURSE`; смещения `recommendedStartOffsetDays` / `recommendedEndOffsetDays`; предопределённые feedback-опции (чекбоксы).
 
 #### Assignment — Назначение онбординга
 
-`GET/POST /onboardings/*`
-- `POST /onboardings` — назначить онбординг из шаблона (создаёт снимок шагов + чат атомарно; email + уведомление assignedTo)
-- `GET /onboardings` — список всех онбордингов (Admin, фильтры: `assignedToId`, `assignedById`, `status`)
-- `GET /me/onboardings` — мои онбординги (сотрудник)
-- `GET /me/assigned-onboardings` — онбординги, назначенные мной (менеджер)
-- `GET /onboardings/:id` — детальный онбординг (все шаги, статусы, feedback)
-- `POST /onboardings/:id/steps/:stepId/complete` — завершить шаг (с feedback_text и/или выбором опций)
+- `POST /onboardings` — назначить (snapshot шаблона + чат в одной транзакции; email + уведомление)
+- `GET /onboardings` — список (Admin; фильтры: `assignedToId`, `assignedById`, `status`)
+- `GET /me/onboardings` / `GET /me/assigned-onboardings`
+- `GET /onboardings/:id` — все шаги, статусы, feedback
+- `POST /onboardings/:id/steps/:stepId/complete` — завершить шаг (feedback_text и/или выбор опций)
 - `POST /onboardings/:id/cancel` — отменить онбординг
-
-**Логика онбординга:**
-- При назначении шаблон "снимается" (snapshot) — дальнейшие изменения шаблона не влияют на активный онбординг
-- Дата `recommendedStart/EndOffsetDays` материализуется в конкретные даты при назначении
-- Чат создаётся одновременно с онбордингом в одной транзакции
 
 #### Chat — Чат онбординга
 
-`GET/POST /onboardings/:onboardingId/chat/messages`
-- `GET /onboardings/:onboardingId/chat/messages` — история (cursor-based пагинация, `before=<messageId>`)
-- `POST /onboardings/:onboardingId/chat/messages` — отправить сообщение
-- `POST /onboardings/:onboardingId/chat/messages/read` — отметить прочитанными
+- `GET /onboardings/:id/chat/messages` — история (cursor-based: `before=<messageId>`)
+- `POST /onboardings/:id/chat/messages` — отправить сообщение
+- `POST /onboardings/:id/chat/messages/read` — отметить прочитанными
 
-**WebSocket** (`/chat` namespace):
-- `subscribe { chatId }` — подписаться на чат-комнату
-- Событие `message:created` — новое сообщение в реальном времени
+**WebSocket** (`/chat`): `subscribe { chatId }` → событие `message:created`.
 
 ---
 
 ### Notifications — Уведомления
 
-`GET/POST /me/notifications/*`
-- `GET /me/notifications` — уведомления пользователя (пагинация: `limit`, `page`)
-- `POST /me/notifications/:id/read` — отметить одно уведомление прочитанным
-- `POST /me/notifications/read-all` — отметить все прочитанными
+- `GET /me/notifications` — уведомления (пагинация: `limit`, `page`)
+- `POST /me/notifications/:id/read` — прочитать одно
+- `POST /me/notifications/read-all` — прочитать все
 
-**WebSocket** (`/notifications` namespace):
-- Аутентификация по токену в handshake
-- Событие `notification:created` — push-уведомление в реальном времени
+**WebSocket** (`/notifications`): событие `notification:created` — push в реальном времени.
 
-**Уведомления отправляются при:**
-- Одобрении заявки на курс (`COURSE_APPLICATION_APPROVED`)
-- Назначении онбординга (в сервисе assign-onboarding)
+Уведомления отправляются при: одобрении заявки на курс, назначении онбординга.
 
 ---
 
 ### Mail — Email
 
-Отправка email через SMTP (MailHog в dev):
-- При назначении онбординга → письмо с датами (`sendOnboardingAssigned`)
-- При одобрении заявки на курс → письмо с названием курса (`sendCourseEnrollmentApproved`)
+- При назначении онбординга → письмо с датами
+- При одобрении заявки на курс → письмо с названием курса
+
+SMTP; в dev — MailHog (`localhost:8025`).
 
 ---
 
-## Проблемы и технический долг
+## Технический долг
 
-### Исправленные проблемы
-
-| # | Проблема | Статус |
-|---|----------|--------|
-| 2 | `GET /lessons/:id` отсутствовал | ✅ Добавлен |
-| 3 | `PATCH /employees/:id` — любой мог редактировать чужой профиль | ✅ Проверка: только сам или Admin |
-| 4 | `UserPrismaRepository` использовал `this.prismaService.client` напрямую | ✅ Уже использовал `this.db` |
-| 5 | Дублирующиеся файлы `enrollment/application/create-enrollment/` | ✅ Удалены дубликаты |
-| 6 | `education/module/` — мёртвый код (неиспользуемые create/delete-module) | ✅ Папка удалена |
-
-### Оставшиеся / некритические
+### Некритические проблемы
 
 | # | Проблема | Место | Влияние |
 |---|----------|-------|---------|
-| 1 | `POST /user` не защищён (`@Roles`) и не назначает роль | `user.controller.ts` | Может создавать невалидных пользователей |
-| 7 | `SMTP_FROM` нет в `EnvSchema` — env читается напрямую в `mail.service.ts` | `mail.service.ts` | Отсутствие валидации конфига |
-
-### Реализованный ранее отсутствующий функционал
-
-| # | Что реализовано |
-|---|-----------------|
-| 1 | `visibleToMe` фильтр в `GET /courses` — курсы по scope текущего пользователя |
-| 2 | `GET /lessons/:id` — прямой просмотр контента урока |
-| 3 | `PATCH /questions/:id` — редактирование вопроса и ответов |
-| 4 | Проверка scope при записи на курс (`CreateEnrollmentCommandHandler`) |
-| 5 | Re-enrollment после статуса CANCELLED — очистка прогресса + реактивация |
-| 6 | Блокировка повторного старта теста при активной незавершённой попытке |
-| 7 | Архивирование курса (`isArchived`, `PATCH /courses/:id/archive|unarchive`) |
-| 8 | Пагинация уведомлений (`limit/page` вместо захардкоженных 50) |
-| 9 | Защита `PATCH /employees/:id` — только сам или Admin |
+| 1 | `POST /user` не защищён и не назначает роль | `user.controller.ts` | Создаёт невалидных пользователей |
+| 2 | `SMTP_FROM` нет в `EnvSchema` | `mail.service.ts` | Нет валидации конфига |
 
 ### Что ещё требует внимания
 
-| # | Что отсутствует | Приоритет |
-|---|-----------------|-----------|
-| 1 | Health-check endpoint (`/health`) | Средний (нужен для prod/k8s) |
-| 2 | `prisma/seed.ts` — демо-данные для разработки | Низкий |
-| 3 | CI: `pnpm prisma generate` перед `pnpm build` в `.github/workflows/ci.yaml` | Средний |
-| 4 | Тесты (unit/integration/e2e) — покрытие практически нулевое | Высокий |
-| 5 | `POST /user` — защитить или убрать (Admin only) | Низкий |
-
-### Pending: миграция базы данных
-
-После всех изменений необходимо выполнить:
-
-```bash
-pnpm prisma migrate dev --name course-archive
-```
-
-Это применит поле `is_archived BOOLEAN DEFAULT false` к таблице `courses`.
+| # | Что | Приоритет |
+|---|-----|-----------|
+| 1 | Тесты (unit/integration/e2e) — покрытие практически нулевое | Высокий |
+| 2 | Health-check endpoint (`/health`) | Средний |
+| 3 | CI: добавить `pnpm prisma generate` перед `pnpm build` | Средний |
+| 4 | `prisma/seed.ts` — демо-данные | Низкий |
 
 ---
 
@@ -323,7 +277,7 @@ pnpm prisma migrate dev --name course-archive
 | Database | PostgreSQL |
 | Cache / Sessions | Redis |
 | File Storage | MinIO (S3-compatible) |
-| Auth | JWT (access cookie + refresh cookie) + Argon2 |
+| Auth | JWT (access + refresh cookies) + Argon2 |
 | Real-time | Socket.IO (WebSocket) |
 | Email | Nodemailer + MailHog (dev) |
 | Architecture | DDD + CQRS, bounded contexts |
@@ -359,7 +313,6 @@ pnpm prisma migrate dev --name course-archive
 | | `/employees/me/subordinates` | GET | Any |
 | | `/employees/:id` | GET/PATCH/DELETE | Any/Self+Admin/Admin |
 | | `/employees/:id/promote` | PATCH | Admin |
-| | *(фильтры GET: divisionId, departmentId, roleId)* | | |
 | **File** | `/files` | POST | Any |
 | | `/files/:id` | GET/DELETE | Any |
 | **Course** | `/courses` | POST/GET | Admin/Any |
@@ -369,34 +322,41 @@ pnpm prisma migrate dev --name course-archive
 | | `/courses/:id/analytics` | GET | Any |
 | | `/courses/:id/archive` | PATCH | Admin |
 | | `/courses/:id/unarchive` | PATCH | Admin |
+| | `/courses/:id/generate-test` | POST | Admin |
 | | `/courses/:id/modules` | POST | Admin |
 | | `/courses/:id/modules/:mId` | DELETE | Admin |
 | | `/courses/:id/modules/:mId/steps` | POST | Admin |
 | | `/courses/:id/modules/:mId/steps/:sId` | DELETE | Admin |
+| | `/courses/:id/modules/:mId/generate-test` | POST | Admin |
+| | `/courses/:id/modules/:mId/questions` | GET | Admin |
 | | `/courses/:id/questions` | POST/GET | Admin |
-| | `/questions/:id` | PATCH/DELETE | Admin |
+| | `/courses/:id/questions/stats` | GET | Admin |
+| | `/courses/:id/enroll` | POST | Admin |
+| | `/courses/:id/enrollments` | GET | Admin |
+| | `/courses/:id/applications` | POST/GET | Any/Admin |
+| | `/courses/:id/applications/:appId/approve` | PATCH | Admin |
+| | `/courses/:id/applications/:appId/reject` | PATCH | Admin |
+| **Question** | `/questions/:id` | GET/PATCH/DELETE | Admin |
 | **Lesson** | `/lessons` | POST | Admin |
 | | `/lessons/:id` | GET/PATCH/DELETE | Any/Admin/Admin |
 | **Test** | `/test-definitions` | POST | Admin |
 | | `/test-definitions/:id` | GET/PATCH/DELETE | Admin |
-| | `/test-definitions/:id/questions` | POST/DELETE | Admin |
-| **Test Attempt** | `/tests/:testId/attempts` | POST | Any |
+| | `/test-definitions/:id/questions` | POST | Admin |
+| | `/test-definitions/:id/questions/bulk` | POST | Admin |
+| | `/test-definitions/:id/questions/:qId` | DELETE | Admin |
+| | `/test-definitions/:id/generate` | POST | Admin |
+| **Test Attempt** | `/tests/:testId/attempts` | POST/GET | Any |
 | | `/attempts/:id` | GET | Any |
 | | `/attempts/:id/answers` | POST | Any |
 | | `/attempts/:id/finish` | POST | Any |
-| **Enrollment** | `/courses/:id/enroll` | POST | Admin |
-| | `/courses/:id/enrollments` | GET | Admin |
-| | `/me/enrollments` | GET | Any |
+| **Enrollment** | `/me/enrollments` | GET | Any |
 | | `/enrollments/:id` | GET/DELETE | Any |
 | | `/enrollments/:id/steps/:stepId/start` | POST | Any |
 | | `/enrollments/:id/steps/:stepId/complete` | POST | Any |
-| **Application** | `/courses/:id/applications` | POST/GET | Any/Admin |
-| | `/courses/:id/applications/:appId/approve` | PATCH | Admin |
-| | `/courses/:id/applications/:appId/reject` | PATCH | Admin |
-| | `/me/applications` | GET | Any |
+| **Application** | `/me/applications` | GET | Any |
 | **Onboarding Template** | `/onboarding/templates` | POST/GET | Admin |
 | | `/onboarding/templates/:id` | GET/PUT | Admin |
-| **Onboarding** | `/onboardings` | POST/GET | Any/Any |
+| **Onboarding** | `/onboardings` | POST/GET | Admin/Any |
 | | `/me/onboardings` | GET | Any |
 | | `/me/assigned-onboardings` | GET | Any |
 | | `/onboardings/:id` | GET | Any |

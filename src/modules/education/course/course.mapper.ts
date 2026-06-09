@@ -9,12 +9,16 @@ export const courseInclude = {
     include: {
       steps: {
         orderBy: { position: 'asc' as const },
-        include: { lesson: { select: { content: true } } },
+        include: {
+          lesson: { select: { id: true, name: true, content: true } },
+          test: { select: { id: true, name: true, passingPercent: true } },
+        },
       },
     },
   },
   department: { select: { id: true, name: true } },
   division: { select: { id: true, name: true } },
+  author: { select: { fullname: true, avatarId: true } },
 } satisfies Prisma.CourseInclude;
 
 export type CourseRecord = Prisma.CourseGetPayload<{

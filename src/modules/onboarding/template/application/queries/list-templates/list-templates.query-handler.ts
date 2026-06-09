@@ -40,7 +40,7 @@ export class ListOnboardingTemplatesQueryHandler implements IQueryHandler<
             id: r.id,
             name: r.name,
             description: r.description,
-            positionId: r.positionId,
+            positionId: r.positionId ?? undefined,
             divisionId: r.divisionId,
             coverId: r.coverId,
             stepCount: r._count.steps,

@@ -11,6 +11,8 @@ export interface TestDefinitionRepositoryPort {
   delete(id: string): Promise<void>;
   addQuestion(testId: string, questionId: string): Promise<void>;
   removeQuestion(testId: string, questionId: string): Promise<void>;
+  bulkAddQuestions(testId: string, questionIds: string[]): Promise<void>;
+  replaceQuestions(testId: string, questionIds: string[]): Promise<void>;
 }
 
 export interface CourseQuestionRepositoryPort {

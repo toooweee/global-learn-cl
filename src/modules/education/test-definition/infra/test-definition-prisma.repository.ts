@@ -66,6 +66,30 @@ export class TestDefinitionPrismaRepository
       where: { testId_questionId: { testId, questionId } },
     });
   }
+
+  async bulkAddQuestions(testId: string, questionIds: string[]): Promise<void> {
+    await this.db.testQuestion.createMany({
+      data: questionIds.map((questionId) => ({
+        id: randomUUID(),
+        testId,
+        questionId,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  async replaceQuestions(testId: string, questionIds: string[]): Promise<void> {
+    await this.db.$transaction([
+      this.db.testQuestion.deleteMany({ where: { testId } }),
+      this.db.testQuestion.createMany({
+        data: questionIds.map((questionId) => ({
+          id: randomUUID(),
+          testId,
+          questionId,
+        })),
+      }),
+    ]);
+  }
 }
 
 @Injectable()

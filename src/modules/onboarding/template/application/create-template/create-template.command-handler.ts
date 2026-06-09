@@ -22,7 +22,7 @@ export class CreateOnboardingTemplateHandler implements ICommandHandler<
   ): Promise<IdResponseDto> {
     return this.repository.transaction(async () => {
       const existing = await this.repository.findForRole(
-        command.positionId,
+        command.positionId ?? null,
         command.divisionId,
       );
       if (existing.isSome()) {

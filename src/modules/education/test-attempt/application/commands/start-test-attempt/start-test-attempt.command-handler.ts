@@ -1,7 +1,7 @@
 import { Inject } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 import { RequestContextService } from '@/libs/application/context/app-request-context';
+import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 import { IdResponseDto } from '@/libs/api/dto';
 import { TestAttemptEntity } from '@/modules/education/test-attempt/domain/test-attempt.entity';
 import { StartTestAttemptCommand } from './start-test-attempt.command';
@@ -31,11 +31,7 @@ export class StartTestAttemptCommandHandler implements ICommandHandler<
       command.testId,
     );
     if (active.isSome()) {
-      throw new ApplicationException(
-        'You already have an active attempt for this test',
-        409,
-        'TEST_ATTEMPT_ALREADY_IN_PROGRESS',
-      );
+      return new IdResponseDto(active.unwrap().id);
     }
 
     const attempt = TestAttemptEntity.create({

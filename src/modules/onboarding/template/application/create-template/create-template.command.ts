@@ -4,7 +4,7 @@ import { CreateOnboardingTemplateProps } from '@/modules/onboarding/template/tem
 export class CreateOnboardingTemplateCommand extends Command {
   readonly name: string;
   readonly description: string;
-  readonly positionId: string;
+  readonly positionId?: string;
   readonly divisionId: string;
   readonly coverId?: string;
   readonly steps: CreateOnboardingTemplateProps['steps'];
@@ -12,7 +12,7 @@ export class CreateOnboardingTemplateCommand extends Command {
   constructor(props: {
     name: string;
     description: string;
-    positionId: string;
+    positionId?: string;
     divisionId: string;
     coverId?: string;
     steps: CreateOnboardingTemplateProps['steps'];

@@ -19,7 +19,7 @@ export class UpdateEmployeeCommandHandler implements ICommandHandler<
   ) {}
 
   async execute(command: UpdateEmployeeCommand): Promise<void> {
-    const option = await this.repository.findById(command.id);
+    const option = await this.repository.findById(command.employeeId);
     if (option.isNone()) {
       throw new ApplicationException(
         'Employee not found',

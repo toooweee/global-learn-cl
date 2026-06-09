@@ -19,6 +19,8 @@ export const EnvSchema = z.object({
 
   TEST_ADMIN_EMAIL: z.string(),
   TEST_ADMIN_PASSWORD: z.string(),
+  TEST_EMPLOYEE_EMAIL: z.string(),
+  TEST_EMPLOYEE_PASSWORD: z.string(),
 
   MINIO_ENDPOINT: z.string(),
   MINIO_ROOT_USER: z.string().min(1),

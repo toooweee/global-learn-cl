@@ -3,7 +3,7 @@ import { OnboardingStepType } from '@generated/client';
 export interface OnboardingTemplateProps {
   name: string;
   description: string;
-  positionId: string;
+  positionId?: string;
   divisionId: string;
   coverId?: string;
   steps: OnboardingTemplateStepProps[];
@@ -14,7 +14,7 @@ export interface OnboardingTemplateProps {
 export interface CreateOnboardingTemplateProps {
   name: string;
   description: string;
-  positionId: string;
+  positionId?: string;
   divisionId: string;
   coverId?: string;
   steps: CreateOnboardingTemplateStepProps[];

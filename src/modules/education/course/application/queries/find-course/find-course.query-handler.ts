@@ -4,6 +4,7 @@ import { RequestContextService } from '@/libs/application/context/app-request-co
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { courseInclude } from '@/modules/education/course/course.mapper';
 import {
+  AuthorSummaryDto,
   CourseScopeDto,
   CourseResponseDto,
   EnrollmentProgressDto,
@@ -38,6 +39,7 @@ export class FindCourseQueryHandler implements IQueryHandler<
             select: {
               id: true,
               status: true,
+              startedAt: true,
               completedAt: true,
               progress: { select: { stepId: true, completedAt: true } },
             },
@@ -74,6 +76,7 @@ export class FindCourseQueryHandler implements IQueryHandler<
         totalSteps,
         completionRate:
           totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0,
+        startedAt: enrollment.startedAt ?? undefined,
         completedAt: enrollment.completedAt ?? undefined,
       });
     }
@@ -92,7 +95,12 @@ export class FindCourseQueryHandler implements IQueryHandler<
       updatedAt: row.updatedAt,
       name: row.name,
       description: row.description,
-      authorId: row.authorId,
+      isArchived: row.isArchived,
+      author: new AuthorSummaryDto({
+        id: row.authorId,
+        fullname: row.author?.fullname ?? '',
+        avatarId: row.author?.avatarId,
+      }),
       coverId: row.coverId,
       scopeInfo,
       modules: row.modules.map(
@@ -109,8 +117,11 @@ export class FindCourseQueryHandler implements IQueryHandler<
                   position: step.position,
                   type: step.type,
                   lessonId: step.lessonId ?? undefined,
+                  lessonName: step.lesson?.name ?? undefined,
                   lessonContent: step.lesson?.content ?? undefined,
                   testId: step.testId ?? undefined,
+                  testName: step.test?.name ?? undefined,
+                  testPassingPercent: step.test?.passingPercent ?? undefined,
                   isCompleted: completedStepIds.has(step.id),
                 }),
             ),

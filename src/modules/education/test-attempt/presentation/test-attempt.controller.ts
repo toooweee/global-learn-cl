@@ -22,10 +22,12 @@ import { StartTestAttemptCommand } from '@/modules/education/test-attempt/applic
 import { AnswerQuestionCommand } from '@/modules/education/test-attempt/application/commands/answer-question/answer-question.command';
 import { FinishTestAttemptCommand } from '@/modules/education/test-attempt/application/commands/finish-test-attempt/finish-test-attempt.command';
 import { FindTestAttemptQuery } from '@/modules/education/test-attempt/application/queries/find-test-attempt/find-test-attempt.query';
+import { FindTestAttemptsQuery } from '@/modules/education/test-attempt/application/queries/find-test-attempts/find-test-attempts.query';
 import { AnswerQuestionRequestDto } from './dto/answer-question.request.dto';
 import {
   TestAttemptResponseDto,
   TestAttemptResultDto,
+  TestAttemptSummaryDto,
 } from './dto/test-attempt.response.dto';
 
 @ApiTags('test-attempts')
@@ -37,10 +39,22 @@ export class TestAttemptController {
   ) {}
 
   @Post('tests/:testId/attempts')
-  @ApiOperation({ summary: 'Start a new test attempt' })
+  @ApiOperation({
+    summary:
+      'Start or resume a test attempt (returns existing active attempt ID if one already exists)',
+  })
   @ApiCreatedResponse({ type: IdResponseDto })
   start(@Param('testId') testId: string): Promise<IdResponseDto> {
     return this.commandBus.execute(new StartTestAttemptCommand({ testId }));
+  }
+
+  @Get('tests/:testId/attempts')
+  @ApiOperation({ summary: 'List my attempts for a test (most recent first)' })
+  @ApiOkResponse({ type: [TestAttemptSummaryDto] })
+  findByTest(
+    @Param('testId') testId: string,
+  ): Promise<TestAttemptSummaryDto[]> {
+    return this.queryBus.execute(new FindTestAttemptsQuery({ testId }));
   }
 
   @Get('attempts/:id')
