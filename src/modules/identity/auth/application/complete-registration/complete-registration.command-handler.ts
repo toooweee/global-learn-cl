@@ -17,7 +17,7 @@ export class CompleteRegistrationCommandHandler implements ICommandHandler<
   ) {}
 
   async execute(command: CompleteRegistrationCommand): Promise<void> {
-    const { email, newPassword } = command;
+    const { token, email, newPassword } = command;
 
     const user = await this.prismaService.client.user.findUnique({
       where: { email },
@@ -26,10 +26,42 @@ export class CompleteRegistrationCommandHandler implements ICommandHandler<
       throw new ApplicationException('User not found', 404, 'USER_NOT_FOUND');
     }
 
+    if (!user.passwordResetToken || !user.passwordResetExpiresAt) {
+      throw new ApplicationException(
+        'Invite token not found or already used',
+        400,
+        'INVITE_TOKEN_INVALID',
+      );
+    }
+
+    if (user.passwordResetExpiresAt < new Date()) {
+      throw new ApplicationException(
+        'Invite token has expired',
+        400,
+        'INVITE_TOKEN_EXPIRED',
+      );
+    }
+
+    const valid = await this.passwordService.verify(
+      user.passwordResetToken,
+      token,
+    );
+    if (!valid) {
+      throw new ApplicationException(
+        'Invalid invite token',
+        400,
+        'INVITE_TOKEN_INVALID',
+      );
+    }
+
     const hashedPassword = await this.passwordService.hash(newPassword);
     await this.prismaService.client.user.update({
       where: { id: user.id },
-      data: { hashedPassword },
+      data: {
+        hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpiresAt: null,
+      },
     });
   }
 }

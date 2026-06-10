@@ -46,14 +46,50 @@ export class MailService implements OnModuleInit {
 
   sendEmployeeInvite(
     to: string,
-    data: { email: string; tempPassword: string },
+    data: { fullname: string; inviteLink: string },
   ): Promise<void> {
     return this.send(
       to,
       'Добро пожаловать в GlobalLearn',
-      `<p>Ваш аккаунт создан.</p>
-       <p>Email: <strong>${data.email}</strong></p>
-       <p>Пароль: <strong>${data.tempPassword}</strong></p>`,
+      `<p>Здравствуйте, <strong>${data.fullname}</strong>!</p>
+       <p>Для вас создан аккаунт в системе обучения GlobalLearn.</p>
+       <p>Для завершения регистрации и установки пароля перейдите по ссылке:</p>
+       <p><a href="${data.inviteLink}">${data.inviteLink}</a></p>
+       <p>Ссылка действительна 7 дней.</p>`,
+    );
+  }
+
+  sendPasswordReset(to: string, data: { resetLink: string }): Promise<void> {
+    return this.send(
+      to,
+      'Сброс пароля GlobalLearn',
+      `<p>Вы запросили сброс пароля.</p>
+       <p>Перейдите по ссылке для установки нового пароля:</p>
+       <p><a href="${data.resetLink}">${data.resetLink}</a></p>
+       <p>Ссылка действительна 1 час. Если вы не запрашивали сброс пароля — проигнорируйте это письмо.</p>`,
+    );
+  }
+
+  sendOnboardingCompleted(
+    to: string,
+    data: { onboardingName: string },
+  ): Promise<void> {
+    return this.send(
+      to,
+      'Онбординг завершён',
+      `<p>Поздравляем! Вы успешно завершили онбординг <strong>${data.onboardingName}</strong>.</p>`,
+    );
+  }
+
+  sendEmployeePromoted(
+    to: string,
+    data: { fullname: string; positionName: string },
+  ): Promise<void> {
+    return this.send(
+      to,
+      'Изменение должности',
+      `<p>Уважаемый(ая) <strong>${data.fullname}</strong>!</p>
+       <p>Ваша должность изменена на <strong>${data.positionName}</strong>.</p>`,
     );
   }
 }

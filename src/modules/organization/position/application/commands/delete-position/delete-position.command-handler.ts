@@ -18,7 +18,7 @@ export class DeletePositionCommandHandler implements ICommandHandler<
   ) {}
 
   async execute(command: DeletePositionCommand): Promise<void> {
-    const option = await this.repository.findById(command.id);
+    const option = await this.repository.findById(command.positionId);
     if (option.isNone()) {
       throw new ApplicationException(
         'Position not found',

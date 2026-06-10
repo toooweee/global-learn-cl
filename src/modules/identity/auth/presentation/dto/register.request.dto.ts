@@ -15,15 +15,6 @@ export class RegisterRequestDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
-  @Length(4, 30)
-  password: string;
-
-  @ApiProperty({ example: '2cdc8ab1-6d50-49cc-ba14-54e4ac7ec231' })
-  @IsUUID()
-  roleId: string;
-
   @ApiProperty({ example: 'John Doe' })
   @IsNotEmpty()
   @Length(1, 255)

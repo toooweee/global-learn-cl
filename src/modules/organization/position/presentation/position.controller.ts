@@ -46,7 +46,7 @@ export class PositionController {
 
   @ApiOperation({ summary: 'Create position (Admin only)' })
   @ApiCreatedResponse({ type: IdResponseDto })
-  @Roles('Admin')
+  @Roles('admin')
   @Post()
   async create(@Body() body: CreatePositionRequestDto): Promise<IdResponseDto> {
     const id = await this.commandBus.execute<CreatePositionCommand, string>(
@@ -96,7 +96,7 @@ export class PositionController {
   @ApiOperation({ summary: 'Update position (Admin only)' })
   @ApiOkResponse()
   @ApiNotFoundResponse()
-  @Roles('Admin')
+  @Roles('admin')
   @Patch(':id')
   async update(
     @Param() params: IdRequestDto,
@@ -114,7 +114,7 @@ export class PositionController {
   @ApiOperation({ summary: 'Delete position (Admin only)' })
   @ApiOkResponse()
   @ApiNotFoundResponse()
-  @Roles('Admin')
+  @Roles('admin')
   @Delete(':id')
   async remove(@Param() params: IdRequestDto): Promise<void> {
     await this.commandBus.execute<DeletePositionCommand, void>(

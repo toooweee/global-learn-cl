@@ -23,6 +23,9 @@ model User {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  passwordResetToken     String?   @map("password_reset_token")
+  passwordResetExpiresAt DateTime? @map("password_reset_expires_at") @db.Timestamptz
+
   employee      Employee?
   token         Token[]
   notifications Notification[]
@@ -130,6 +133,7 @@ model Employee {
   onboardingsAssigned Onboarding[]            @relation("OnboardingAssignedBy")
   onboardingsReceived Onboarding[]            @relation("OnboardingAssignedTo")
   chatMessagesSent    OnboardingChatMessage[] @relation("OnboardingChatMessageSender")
+  certificates        CourseCertificate[]
 
   @@map("employees")
 }
@@ -163,15 +167,26 @@ enum CourseScope {
   @@map("course_scope")
 }
 
+enum CourseStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+
+  @@map("course_status")
+}
+
 model Course {
-  id           String      @id @default(uuid()) @db.Uuid
-  name         String      @db.VarChar(255)
-  description  String      @db.Text
-  scope        CourseScope @default(ALL)
-  authorId     String      @map("author_id") @db.Uuid
-  coverId      String?     @map("cover_id") @db.Uuid
-  departmentId String?     @map("department_id") @db.Uuid
-  divisionId   String?     @map("division_id") @db.Uuid
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String       @db.VarChar(255)
+  description  String       @db.Text
+  scope        CourseScope  @default(ALL)
+  status       CourseStatus @default(PUBLISHED)
+  authorId     String       @map("author_id") @db.Uuid
+  coverId      String?      @map("cover_id") @db.Uuid
+  departmentId String?      @map("department_id") @db.Uuid
+  divisionId   String?      @map("division_id") @db.Uuid
+  reviewNote   String?      @map("review_note") @db.Text
   isArchived   Boolean     @default(false) @map("is_archived")
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz
@@ -184,6 +199,7 @@ model Course {
   questions               CourseQuestion[]
   enrollments             CourseEnrollment[]
   applications            CourseApplication[]
+  certificates            CourseCertificate[]
   onboardingTemplateSteps OnboardingTemplateStep[]
   onboardingSteps         OnboardingStep[]
 
@@ -379,10 +395,11 @@ model CourseEnrollment {
   createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
-  course         Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  employee       Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  assignedBy     Employee?       @relation("EnrollmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  course         Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee       Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  assignedBy     Employee?          @relation("EnrollmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
   progress       StepProgress[]
+  certificate    CourseCertificate?
   onboardingStep OnboardingStep?
 
   @@unique([courseId, employeeId])
@@ -402,6 +419,21 @@ model StepProgress {
 
   @@unique([stepId, enrollmentId])
   @@map("step_progress")
+}
+
+model CourseCertificate {
+  id           String   @id @default(uuid()) @db.Uuid
+  enrollmentId String   @unique @map("enrollment_id") @db.Uuid
+  employeeId   String   @map("employee_id") @db.Uuid
+  courseId     String   @map("course_id") @db.Uuid
+  issuedAt     DateTime @map("issued_at") @db.Timestamptz
+
+  enrollment CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  course     Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("course_certificates")
 }
 
 // ============================================================

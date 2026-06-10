@@ -6,6 +6,7 @@ import {
   AddStepProps,
   CourseProps,
   CourseScope,
+  CourseStatus,
   CreateCourseProps,
   ModuleProps,
   UpdateCourseMetadataProps,
@@ -35,11 +36,50 @@ export class CourseEntity extends Entity<CourseProps> {
       props: {
         ...props,
         scope,
+        status: props.status ?? CourseStatus.PUBLISHED,
         isArchived: false,
         modules: [],
         createdAt: new Date(),
       },
     });
+  }
+
+  submitForReview(): void {
+    if (this._props.status !== CourseStatus.DRAFT) {
+      throw new DomainException(
+        'Only DRAFT courses can be submitted for review',
+        'COURSE_INVALID_STATUS_TRANSITION',
+        409,
+      );
+    }
+    this._props.status = CourseStatus.PENDING_REVIEW;
+    this._props.updatedAt = new Date();
+  }
+
+  publish(): void {
+    if (this._props.status !== CourseStatus.PENDING_REVIEW) {
+      throw new DomainException(
+        'Only PENDING_REVIEW courses can be published',
+        'COURSE_INVALID_STATUS_TRANSITION',
+        409,
+      );
+    }
+    this._props.status = CourseStatus.PUBLISHED;
+    this._props.reviewNote = undefined;
+    this._props.updatedAt = new Date();
+  }
+
+  reject(note?: string): void {
+    if (this._props.status !== CourseStatus.PENDING_REVIEW) {
+      throw new DomainException(
+        'Only PENDING_REVIEW courses can be rejected',
+        'COURSE_INVALID_STATUS_TRANSITION',
+        409,
+      );
+    }
+    this._props.status = CourseStatus.REJECTED;
+    this._props.reviewNote = note;
+    this._props.updatedAt = new Date();
   }
 
   static recreate(params: {

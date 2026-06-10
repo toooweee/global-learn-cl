@@ -8,6 +8,8 @@ Table users {
   hashedPassword String [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
+  passwordResetToken String
+  passwordResetExpiresAt DateTime
   employee employees
   token tokens [not null]
   notifications notifications [not null]
@@ -95,6 +97,7 @@ Table employees {
   onboardingsAssigned onboardings [not null]
   onboardingsReceived onboardings [not null]
   chatMessagesSent onboarding_chat_messages [not null]
+  certificates course_certificates [not null]
 }
 
 Table files {
@@ -112,10 +115,12 @@ Table courses {
   name String [not null]
   description String [not null]
   scope CourseScope [not null, default: 'ALL']
+  status CourseStatus [not null, default: 'PUBLISHED']
   authorId String [not null]
   coverId String
   departmentId String
   divisionId String
+  reviewNote String
   isArchived Boolean [not null, default: false]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
@@ -127,6 +132,7 @@ Table courses {
   questions course_questions [not null]
   enrollments course_enrollments [not null]
   applications course_applications [not null]
+  certificates course_certificates [not null]
   onboardingTemplateSteps onboarding_template_steps [not null]
   onboardingSteps onboarding_steps [not null]
 }
@@ -273,6 +279,7 @@ Table course_enrollments {
   employee employees [not null]
   assignedBy employees
   progress step_progress [not null]
+  certificate course_certificates
   onboardingStep onboarding_steps
 
   indexes {
@@ -293,6 +300,17 @@ Table step_progress {
   indexes {
     (stepId, enrollmentId) [unique]
   }
+}
+
+Table course_certificates {
+  id String [pk]
+  enrollmentId String [unique, not null]
+  employeeId String [not null]
+  courseId String [not null]
+  issuedAt DateTime [not null]
+  enrollment course_enrollments [not null]
+  employee employees [not null]
+  course courses [not null]
 }
 
 Table onboarding_templates {
@@ -441,6 +459,13 @@ Enum CourseScope {
   DIVISION
 }
 
+Enum CourseStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+}
+
 Enum StepType {
   LESSON
   TEST
@@ -536,6 +561,12 @@ Ref: course_enrollments.assignedById > employees.id [delete: Cascade]
 Ref: step_progress.stepId > steps.id [delete: Cascade]
 
 Ref: step_progress.enrollmentId > course_enrollments.id [delete: Cascade]
+
+Ref: course_certificates.enrollmentId - course_enrollments.id [delete: Cascade]
+
+Ref: course_certificates.employeeId > employees.id [delete: Cascade]
+
+Ref: course_certificates.courseId > courses.id [delete: Cascade]
 
 Ref: onboarding_templates.positionId > positions.id
 

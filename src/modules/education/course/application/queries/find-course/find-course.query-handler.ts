@@ -55,6 +55,30 @@ export class FindCourseQueryHandler implements IQueryHandler<
       );
     }
 
+    const userRole = RequestContextService.getUserRole();
+    if (userRole !== 'admin' && userId && row.scope !== 'ALL') {
+      const employee = await this.prismaService.client.employee.findUnique({
+        where: { id: userId },
+        select: {
+          divisionId: true,
+          division: { select: { departmentId: true } },
+        },
+      });
+      if (employee) {
+        const forbidden =
+          (row.scope === 'DEPARTMENT' &&
+            employee.division?.departmentId !== row.departmentId) ||
+          (row.scope === 'DIVISION' && employee.divisionId !== row.divisionId);
+        if (forbidden) {
+          throw new ApplicationException(
+            'Access to this course is restricted',
+            403,
+            'COURSE_SCOPE_FORBIDDEN',
+          );
+        }
+      }
+    }
+
     const completedStepIds = new Set<string>();
     let enrollmentDto: EnrollmentProgressDto | undefined;
 

@@ -14,6 +14,7 @@ import { RoleModule } from '@/modules/identity/role/role.module';
 import { FilesModule } from '@/modules/files/file.module';
 import { EducationModule } from '@/modules/education/education.module';
 import { CqrsModule } from '@nestjs/cqrs';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AllExceptionsFilter } from '@/infra/exception-filters/all-exceptions.filter';
 import { JwtAuthGuard } from '@/libs/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/libs/auth/guards/roles.guard';
@@ -37,6 +38,7 @@ const guards: Provider[] = [
 @Module({
   imports: [
     CqrsModule.forRoot(),
+    ScheduleModule.forRoot(),
     RequestContextModule,
     EnvModule,
     PrismaModule,

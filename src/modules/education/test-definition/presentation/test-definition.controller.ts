@@ -61,7 +61,7 @@ class QuestionFilterQueryDto {
 
 @ApiTags('tests')
 @Controller()
-@Roles('Admin')
+@Roles('admin', 'department_head', 'division_head')
 export class TestDefinitionController {
   constructor(
     private readonly commandBus: CommandBus,

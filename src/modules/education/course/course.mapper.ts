@@ -34,6 +34,8 @@ export class CourseMapper implements ToDomain<CourseRecord, CourseEntity> {
         name: row.name,
         description: row.description,
         scope: row.scope,
+        status: row.status,
+        reviewNote: row.reviewNote ?? undefined,
         departmentId: row.departmentId ?? undefined,
         divisionId: row.divisionId ?? undefined,
         authorId: row.authorId,

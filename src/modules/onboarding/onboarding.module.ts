@@ -2,6 +2,8 @@ import { Module, Provider } from '@nestjs/common';
 import { PrismaModule } from '@/infra/prisma/prisma.module';
 import { NotificationModule } from '@/modules/notifications/notification.module';
 import { MailModule } from '@/modules/mail/mail.module';
+import { EmployeeModule } from '@/modules/employee/employee.module';
+import { OnboardingInactivityService } from '@/modules/onboarding/assignment/application/onboarding-inactivity.service';
 
 // Assignment
 import { ONBOARDING_REPOSITORY } from '@/modules/onboarding/assignment/application/ports/onboarding.repository.port';
@@ -53,6 +55,8 @@ const mappers: Provider[] = [
   OnboardingChatMapper,
 ];
 
+const services: Provider[] = [OnboardingInactivityService];
+
 const commandHandlers: Provider[] = [
   CreateOnboardingTemplateHandler,
   UpdateOnboardingTemplateCommandHandler,
@@ -74,7 +78,7 @@ const queryHandlers: Provider[] = [
 ];
 
 @Module({
-  imports: [PrismaModule, NotificationModule, MailModule],
+  imports: [PrismaModule, NotificationModule, MailModule, EmployeeModule],
   controllers: [
     OnboardingTemplateController,
     OnboardingController,
@@ -85,6 +89,7 @@ const queryHandlers: Provider[] = [
     ...mappers,
     ...commandHandlers,
     ...queryHandlers,
+    ...services,
   ],
 })
 export class OnboardingModule {}

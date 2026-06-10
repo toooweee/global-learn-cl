@@ -29,6 +29,8 @@ export class UserMapper implements Mapper<UserEntity, User, UserResponseDto> {
       roleId: props.roleId,
       createdAt: props.createdAt,
       updatedAt: props.updatedAt,
+      passwordResetToken: null,
+      passwordResetExpiresAt: null,
     };
   }
 

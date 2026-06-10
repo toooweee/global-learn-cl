@@ -17,6 +17,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiPropertyOptional,
   ApiTags,
 } from '@nestjs/swagger';
 import { IdResponseDto } from '@/libs/api/dto';
@@ -45,17 +46,29 @@ import {
   CourseResponseDto,
   CourseSummaryResponseDto,
 } from './dto/course.response.dto';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 import {
   CourseAnalyticsResponseDto,
   CoursesOverviewItemDto,
 } from './dto/course-analytics.response.dto';
 import { CreateFullCourseCommand } from '@/modules/education/course/application/commands/create-full-course/create-full-course.command';
 import { ArchiveCourseCommand } from '@/modules/education/course/application/commands/archive-course/archive-course.command';
+import { SubmitCourseForReviewCommand } from '@/modules/education/course/application/commands/submit-course-for-review/submit-course-for-review.command';
+import { PublishCourseCommand } from '@/modules/education/course/application/commands/publish-course/publish-course.command';
+import { RejectCourseCommand } from '@/modules/education/course/application/commands/reject-course/reject-course.command';
 import { GenerateCourseTestCommand } from '@/modules/education/test-definition/application/commands/generate-course-test/generate-course-test.command';
 import { GenerateModuleTestCommand } from '@/modules/education/test-definition/application/commands/generate-module-test/generate-module-test.command';
 import { GenerateFinalTestRequestDto } from '@/modules/education/test-definition/presentation/dto/test-definition.request.dto';
 import { FindCourseQuestionsQuery } from '@/modules/education/test-definition/application/queries/find-course-questions/find-course-questions.query';
 import { CourseQuestionResponseDto } from '@/modules/education/test-definition/presentation/dto/test-definition.response.dto';
+
+class RejectCourseRequestDto {
+  @ApiPropertyOptional({ description: 'Rejection reason visible to author' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  note?: string;
+}
 
 @ApiTags('courses')
 @Controller('courses')
@@ -66,8 +79,11 @@ export class CourseController {
   ) {}
 
   @Post()
-  @Roles('Admin')
-  @ApiOperation({ summary: 'Create a course' })
+  @Roles('admin', 'department_head', 'division_head')
+  @ApiOperation({
+    summary:
+      'Create a course (Admin → PUBLISHED immediately; Manager → DRAFT, must submit for review)',
+  })
   @ApiCreatedResponse({ type: IdResponseDto })
   create(@Body() dto: CreateCourseRequestDto): Promise<IdResponseDto> {
     return this.commandBus.execute(
@@ -83,9 +99,10 @@ export class CourseController {
   }
 
   @Post('full')
-  @Roles('Admin')
+  @Roles('admin', 'department_head', 'division_head')
   @ApiOperation({
-    summary: 'Create a course with modules and steps atomically',
+    summary:
+      'Create a course with modules and steps atomically (Admin → PUBLISHED; Manager → DRAFT)',
   })
   @ApiCreatedResponse({ type: IdResponseDto })
   createFull(@Body() dto: CreateFullCourseRequestDto): Promise<IdResponseDto> {
@@ -115,6 +132,8 @@ export class CourseController {
       new FindCoursesQuery({
         limit: query.limit,
         page: query.page,
+        search: query.search,
+        authorId: query.authorId,
         scope: query.scope,
         departmentId: query.departmentId,
         divisionId: query.divisionId,
@@ -159,9 +178,11 @@ export class CourseController {
   }
 
   @Patch(':id')
-  @Roles('Admin')
+  @Roles('admin', 'department_head', 'division_head')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Update course metadata' })
+  @ApiOperation({
+    summary: 'Update course metadata (Manager can only update own courses)',
+  })
   @ApiNoContentResponse()
   @ApiNotFoundResponse()
   update(
@@ -182,7 +203,7 @@ export class CourseController {
   }
 
   @Delete(':id')
-  @Roles('Admin')
+  @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a course' })
   @ApiNoContentResponse()
@@ -191,8 +212,49 @@ export class CourseController {
     return this.commandBus.execute(new DeleteCourseCommand({ courseId: id }));
   }
 
+  @Patch(':id/submit')
+  @Roles('admin', 'department_head', 'division_head')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Submit a DRAFT course for admin review (author or Admin)',
+  })
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse()
+  submitForReview(@Param() { id }: IdRequestDto): Promise<void> {
+    return this.commandBus.execute(
+      new SubmitCourseForReviewCommand({ courseId: id }),
+    );
+  }
+
+  @Patch(':id/publish')
+  @Roles('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Publish a PENDING_REVIEW course (Admin only)' })
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse()
+  publish(@Param() { id }: IdRequestDto): Promise<void> {
+    return this.commandBus.execute(new PublishCourseCommand({ courseId: id }));
+  }
+
+  @Patch(':id/reject')
+  @Roles('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Reject a PENDING_REVIEW course with optional note (Admin only)',
+  })
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse()
+  reject(
+    @Param() { id }: IdRequestDto,
+    @Body() dto: RejectCourseRequestDto,
+  ): Promise<void> {
+    return this.commandBus.execute(
+      new RejectCourseCommand({ courseId: id, note: dto.note }),
+    );
+  }
+
   @Patch(':id/archive')
-  @Roles('Admin')
+  @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Archive a course (hides it from listings)' })
   @ApiNoContentResponse()
@@ -204,7 +266,7 @@ export class CourseController {
   }
 
   @Patch(':id/unarchive')
-  @Roles('Admin')
+  @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Unarchive a course' })
   @ApiNoContentResponse()
@@ -216,7 +278,7 @@ export class CourseController {
   }
 
   @Post(':id/modules')
-  @Roles('Admin')
+  @Roles('admin', 'department_head', 'division_head')
   @ApiOperation({ summary: 'Add a module to a course' })
   @ApiCreatedResponse({ type: IdResponseDto })
   @ApiNotFoundResponse()
@@ -230,7 +292,7 @@ export class CourseController {
   }
 
   @Delete(':id/modules/:moduleId')
-  @Roles('Admin')
+  @Roles('admin', 'department_head', 'division_head')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a module from a course' })
   @ApiNoContentResponse()
@@ -245,7 +307,7 @@ export class CourseController {
   }
 
   @Post(':id/modules/:moduleId/steps')
-  @Roles('Admin')
+  @Roles('admin', 'department_head', 'division_head')
   @ApiOperation({ summary: 'Add a step to a module' })
   @ApiCreatedResponse({ type: IdResponseDto })
   @ApiNotFoundResponse()
@@ -267,7 +329,7 @@ export class CourseController {
   }
 
   @Delete(':id/modules/:moduleId/steps/:stepId')
-  @Roles('Admin')
+  @Roles('admin', 'department_head', 'division_head')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a step from a module' })
   @ApiNoContentResponse()
@@ -283,7 +345,7 @@ export class CourseController {
   }
 
   @Post(':id/generate-test')
-  @Roles('Admin')
+  @Roles('admin')
   @ApiOperation({
     summary:
       'Create a final test for the whole course from its question bank. Name: "Итоговый тест по {courseName}". Returns the new test ID.',
@@ -304,7 +366,7 @@ export class CourseController {
   }
 
   @Post(':id/modules/:moduleId/generate-test')
-  @Roles('Admin')
+  @Roles('admin')
   @ApiOperation({
     summary:
       'Create a final test for a single module from its question bank. Name: "Итоговый тест по модулю {moduleName}". Returns the new test ID.',
@@ -327,7 +389,7 @@ export class CourseController {
   }
 
   @Get(':id/modules/:moduleId/questions')
-  @Roles('Admin')
+  @Roles('admin')
   @ApiOperation({
     summary:
       'List question bank for a specific module (subset of the course bank)',

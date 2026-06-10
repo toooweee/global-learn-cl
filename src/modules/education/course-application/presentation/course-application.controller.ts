@@ -55,7 +55,7 @@ export class CourseApplicationController {
   }
 
   @Get('courses/:id/applications')
-  @Roles('Admin')
+  @Roles('admin')
   @ApiOperation({
     summary: 'List applications for a course (filterable by status)',
   })
@@ -75,7 +75,7 @@ export class CourseApplicationController {
   }
 
   @Patch('courses/:id/applications/:appId/approve')
-  @Roles('Admin')
+  @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Approve a course application' })
   @ApiNoContentResponse()
@@ -87,7 +87,7 @@ export class CourseApplicationController {
   }
 
   @Patch('courses/:id/applications/:appId/reject')
-  @Roles('Admin')
+  @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Reject a course application' })
   @ApiNoContentResponse()

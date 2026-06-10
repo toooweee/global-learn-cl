@@ -31,6 +31,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-socket.io": "^11.1.24",
+    "@nestjs/schedule": "^6.1.3",
     "@nestjs/swagger": "^11.4.4",
     "@nestjs/websockets": "^11.1.24",
     "@prisma/adapter-pg": "^7.8.0",
@@ -98,6 +99,13 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^nanoid$": "<rootDir>/../test/mocks/nanoid.ts",
+      "^@generated/(.*)$": "<rootDir>/../generated/prisma/$1",
+      "^@generated$": "<rootDir>/../generated/prisma",
+      "^@/(.*)$": "<rootDir>/$1",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

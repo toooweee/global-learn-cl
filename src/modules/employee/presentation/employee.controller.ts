@@ -36,6 +36,10 @@ import { PromoteEmployeeCommand } from '@/modules/employee/application/promote-e
 import { FindEmployeeQuery } from '@/modules/employee/application/queries/find-employee/find-employee.query';
 import { FindEmployeesQuery } from '@/modules/employee/application/queries/find-employees/find-employees.query';
 import { FindMySubordinatesQuery } from '@/modules/employee/application/queries/find-my-subordinates/find-my-subordinates.query';
+import { GetManagerDashboardQuery } from '@/modules/employee/application/queries/get-manager-dashboard/get-manager-dashboard.query';
+import { GetSubordinateTreeQuery } from '@/modules/employee/application/queries/get-subordinate-tree/get-subordinate-tree.query';
+import { SubordinateTreeNodeDto } from '@/modules/employee/presentation/dto/subordinate-tree.response.dto';
+import { ManagerDashboardResponseDto } from '@/modules/employee/presentation/dto/manager-dashboard.response.dto';
 import { IsOptional, IsUUID } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -66,7 +70,7 @@ export class EmployeeController {
 
   @ApiOperation({ summary: 'Register employee (Admin only)' })
   @ApiCreatedResponse({ type: IdResponseDto })
-  @Roles('Admin')
+  @Roles('admin')
   @Post()
   async create(@Body() body: CreateEmployeeRequestDto): Promise<IdResponseDto> {
     const id = await this.commandBus.execute<CreateEmployeeCommand, string>(
@@ -101,7 +105,21 @@ export class EmployeeController {
     });
   }
 
-  @ApiOperation({ summary: 'Get my direct subordinates' })
+  @ApiOperation({
+    summary:
+      'Get manager dashboard: all recursive subordinates with their course and onboarding progress',
+  })
+  @ApiOkResponse({ type: ManagerDashboardResponseDto })
+  @Get('me/team-dashboard')
+  getTeamDashboard(
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ManagerDashboardResponseDto> {
+    return this.queryBus.execute(new GetManagerDashboardQuery(user.userId));
+  }
+
+  @ApiOperation({
+    summary: 'Get my direct subordinates (flat list, one level)',
+  })
   @ApiOkResponse({ type: [EmployeeResponseDto] })
   @Get('me/subordinates')
   async getMySubordinates(
@@ -111,6 +129,21 @@ export class EmployeeController {
       FindMySubordinatesQuery,
       EmployeeResponseDto[]
     >(new FindMySubordinatesQuery(user.userId));
+  }
+
+  @ApiOperation({
+    summary:
+      'Get subordinate org-chart tree: all recursive direct reports grouped by position hierarchy',
+  })
+  @ApiOkResponse({ type: [SubordinateTreeNodeDto] })
+  @Get('me/subordinates/tree')
+  getSubordinateTree(
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<SubordinateTreeNodeDto[]> {
+    return this.queryBus.execute<
+      GetSubordinateTreeQuery,
+      SubordinateTreeNodeDto[]
+    >(new GetSubordinateTreeQuery(user.userId));
   }
 
   @ApiOperation({ summary: 'Get employee by id' })
@@ -154,7 +187,7 @@ export class EmployeeController {
   @ApiOperation({ summary: 'Promote employee (change position, Admin only)' })
   @ApiOkResponse()
   @ApiNotFoundResponse()
-  @Roles('Admin')
+  @Roles('admin')
   @Patch(':id/promote')
   async promote(
     @Param() params: IdRequestDto,
@@ -171,7 +204,7 @@ export class EmployeeController {
   @ApiOperation({ summary: 'Dismiss employee (soft delete, Admin only)' })
   @ApiOkResponse()
   @ApiNotFoundResponse()
-  @Roles('Admin')
+  @Roles('admin')
   @Delete(':id')
   async dismiss(@Param() params: IdRequestDto): Promise<void> {
     await this.commandBus.execute<DeleteEmployeeCommand, void>(

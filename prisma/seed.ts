@@ -46,43 +46,60 @@ const companyStructure = [
 async function main() {
   // ── Roles ─────────────────────────────────────────────────────────────────
   const adminRole = await prisma.role.upsert({
-    where: { name: 'Admin' },
+    where: { name: 'admin' },
     update: {},
-    create: { name: 'Admin' },
+    create: { name: 'admin' },
   });
-  const employeeRole = await prisma.role.upsert({
-    where: { name: 'Employee' },
+  const deptHeadRole = await prisma.role.upsert({
+    where: { name: 'department_head' },
     update: {},
-    create: { name: 'Employee' },
+    create: { name: 'department_head' },
   });
-  console.log('✓ Roles: Admin, Employee');
+  const divHeadRole = await prisma.role.upsert({
+    where: { name: 'division_head' },
+    update: {},
+    create: { name: 'division_head' },
+  });
+  const seniorManagerRole = await prisma.role.upsert({
+    where: { name: 'senior_manager' },
+    update: {},
+    create: { name: 'senior_manager' },
+  });
+  const managerRole = await prisma.role.upsert({
+    where: { name: 'manager' },
+    update: {},
+    create: { name: 'manager' },
+  });
+  console.log(
+    '✓ Roles: admin, department_head, division_head, senior_manager, manager',
+  );
 
-  // ── Positions (иерархия) ───────────────────────────────────────────────────
-  const posManager = await prisma.position.upsert({
-    where: { name: 'Менеджер' },
-    update: {},
-    create: { name: 'Менеджер' },
-  });
-  const posSeniorManager = await prisma.position.upsert({
-    where: { name: 'Старший Менеджер' },
-    update: { parentId: posManager.id },
-    create: { name: 'Старший Менеджер', parentId: posManager.id },
+  // ── Positions (иерархия: корень = наивысшая должность) ───────────────────
+  // parentId = "должность уровнем выше". childrenOf[X] = подчинённые должности.
+  // Корень: Руководитель Департамента (нет родителя)
+  // Лист:   Менеджер
+  const posDeptHead = await prisma.position.upsert({
+    where: { name: 'Руководитель Департамента' },
+    update: { parentId: null },
+    create: { name: 'Руководитель Департамента' },
   });
   const posDivisionHead = await prisma.position.upsert({
     where: { name: 'Руководитель отдела' },
-    update: { parentId: posSeniorManager.id },
-    create: { name: 'Руководитель отдела', parentId: posSeniorManager.id },
+    update: { parentId: posDeptHead.id },
+    create: { name: 'Руководитель отдела', parentId: posDeptHead.id },
   });
-  const posDeptHead = await prisma.position.upsert({
-    where: { name: 'Руководитель Департамента' },
+  const posSeniorManager = await prisma.position.upsert({
+    where: { name: 'Старший Менеджер' },
     update: { parentId: posDivisionHead.id },
-    create: {
-      name: 'Руководитель Департамента',
-      parentId: posDivisionHead.id,
-    },
+    create: { name: 'Старший Менеджер', parentId: posDivisionHead.id },
+  });
+  const posManager = await prisma.position.upsert({
+    where: { name: 'Менеджер' },
+    update: { parentId: posSeniorManager.id },
+    create: { name: 'Менеджер', parentId: posSeniorManager.id },
   });
   console.log(
-    '✓ Positions: Менеджер → Старший Менеджер → Руководитель отдела → Руководитель Департамента',
+    '✓ Positions: Руководитель Департамента → Руководитель отдела → Старший Менеджер → Менеджер',
   );
 
   // ── Departments + Divisions ────────────────────────────────────────────────
@@ -230,6 +247,14 @@ async function main() {
     },
   ];
 
+  // Map positionId → roleId so each employee gets the role matching their position
+  const positionRoleMap: Record<string, string> = {
+    [posDeptHead.id]: deptHeadRole.id,
+    [posDivisionHead.id]: divHeadRole.id,
+    [posSeniorManager.id]: seniorManagerRole.id,
+    [posManager.id]: managerRole.id,
+  };
+
   const employeeIds: Record<string, string> = {};
   for (const emp of employeeProfiles) {
     const existing = await prisma.user.findUnique({
@@ -237,12 +262,15 @@ async function main() {
     });
     if (!existing) {
       const id = randomUUID();
+      const roleId = emp.positionId
+        ? (positionRoleMap[emp.positionId] ?? managerRole.id)
+        : managerRole.id;
       await prisma.user.create({
         data: {
           id,
           email: emp.email,
           hashedPassword: hashedDefaultPassword,
-          roleId: employeeRole.id,
+          roleId,
           employee: {
             create: {
               fullname: emp.fullname,

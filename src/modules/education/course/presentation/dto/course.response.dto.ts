@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CourseScope, StepType } from '@generated/client';
+import { CourseScope, CourseStatus, StepType } from '@generated/client';
 import { BaseResponseDto } from '@/libs/api/dto/base.response.dto';
 
 export class StepProgressDto {
@@ -182,6 +182,8 @@ export class CourseSummaryResponseDto extends BaseResponseDto {
   @ApiProperty({ type: CourseScopeDto }) scopeInfo: CourseScopeDto;
   @ApiProperty() moduleCount: number;
   @ApiProperty() isArchived: boolean;
+  @ApiProperty({ enum: CourseStatus }) status: CourseStatus;
+  @ApiPropertyOptional({ nullable: true }) reviewNote?: string;
   @ApiPropertyOptional({ type: EnrollmentProgressDto })
   enrollment?: EnrollmentProgressDto;
 
@@ -194,6 +196,8 @@ export class CourseSummaryResponseDto extends BaseResponseDto {
     authorId: string;
     coverId?: string | null;
     isArchived: boolean;
+    status: CourseStatus;
+    reviewNote?: string;
     scopeInfo: CourseScopeDto;
     moduleCount: number;
     enrollment?: EnrollmentProgressDto;
@@ -204,6 +208,8 @@ export class CourseSummaryResponseDto extends BaseResponseDto {
     this.authorId = props.authorId;
     this.coverId = props.coverId ?? undefined;
     this.isArchived = props.isArchived;
+    this.status = props.status;
+    this.reviewNote = props.reviewNote;
     this.scopeInfo = props.scopeInfo;
     this.moduleCount = props.moduleCount;
     this.enrollment = props.enrollment;

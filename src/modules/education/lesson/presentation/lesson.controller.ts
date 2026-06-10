@@ -40,7 +40,7 @@ export class LessonController {
   ) {}
 
   @Post()
-  @Roles('Admin')
+  @Roles('admin', 'department_head', 'division_head')
   @ApiOperation({ summary: 'Create a lesson' })
   @ApiCreatedResponse({ type: IdResponseDto })
   create(@Body() dto: CreateLessonRequestDto): Promise<IdResponseDto> {
@@ -58,7 +58,7 @@ export class LessonController {
   }
 
   @Patch(':id')
-  @Roles('Admin')
+  @Roles('admin', 'department_head', 'division_head')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Update lesson name and/or content' })
   @ApiNoContentResponse()
@@ -77,7 +77,7 @@ export class LessonController {
   }
 
   @Delete(':id')
-  @Roles('Admin')
+  @Roles('admin', 'department_head', 'division_head')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a lesson' })
   @ApiNoContentResponse()

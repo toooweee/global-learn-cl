@@ -15,8 +15,6 @@ export class RegisterCommandHandler implements ICommandHandler<
     return this.commandBus.execute<CreateEmployeeCommand, string>(
       new CreateEmployeeCommand({
         email: command.email,
-        password: command.password,
-        roleId: command.roleId,
         fullname: command.fullname,
         divisionId: command.divisionId,
         employmentDate: command.employmentDate,

@@ -3,6 +3,9 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 import { IdResponseDto } from '@/libs/api/dto';
 import { PrismaService } from '@/infra/prisma/prisma.service';
+import { RequestContextService } from '@/libs/application/context/app-request-context';
+import { SubordinateCheckService } from '@/modules/employee/application/subordinate-check.service';
+import { MANAGERIAL_ROLES } from '@/libs/auth/roles.constants';
 import { EnrollmentEntity } from '@/modules/education/enrollment/domain/enrollment.entity';
 import { CreateEnrollmentCommand } from './create-enrollment.command';
 import {
@@ -19,9 +22,30 @@ export class CreateEnrollmentCommandHandler implements ICommandHandler<
     @Inject(ENROLLMENT_REPOSITORY)
     private readonly repository: EnrollmentRepositoryPort,
     private readonly prismaService: PrismaService,
+    private readonly subordinateCheck: SubordinateCheckService,
   ) {}
 
   async execute(command: CreateEnrollmentCommand): Promise<IdResponseDto> {
+    const actorId = RequestContextService.getUserId();
+    const actorRole = RequestContextService.getUserRole();
+    if (
+      MANAGERIAL_ROLES.includes(actorRole as never) &&
+      actorId &&
+      actorId !== command.employeeId
+    ) {
+      const ok = await this.subordinateCheck.isSubordinate(
+        actorId,
+        command.employeeId,
+      );
+      if (!ok) {
+        throw new ApplicationException(
+          'You can only enroll your direct or indirect subordinates',
+          403,
+          'ENROLLMENT_NOT_YOUR_SUBORDINATE',
+        );
+      }
+    }
+
     const course = await this.prismaService.client.course.findUnique({
       where: { id: command.courseId },
       select: {

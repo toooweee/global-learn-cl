@@ -1,10 +1,28 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { PaginatedQueryRequestDto } from '@/libs/api/dto/paginated.query.request.dto';
 import { CourseScope } from '@/modules/education/course/course.types';
 
 export class FindCoursesRequestDto extends PaginatedQueryRequestDto {
+  @ApiPropertyOptional({ description: 'Full-text search by course name' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by author (employee) ID' })
+  @IsOptional()
+  @IsUUID()
+  authorId?: string;
+
   @ApiPropertyOptional({ enum: CourseScope })
   @IsOptional()
   @IsEnum(CourseScope)

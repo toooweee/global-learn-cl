@@ -14,6 +14,9 @@ import { ApplicationException } from '@/libs/application/exceptions/application.
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { NotificationService } from '@/modules/notifications/notification.service';
 import { MailService } from '@/modules/mail/mail.service';
+import { SubordinateCheckService } from '@/modules/employee/application/subordinate-check.service';
+import { RequestContextService } from '@/libs/application/context/app-request-context';
+import { MANAGERIAL_ROLES } from '@/libs/auth/roles.constants';
 
 @CommandHandler(AssignOnboardingCommand)
 export class AssignOnboardingHandler implements ICommandHandler<
@@ -30,9 +33,25 @@ export class AssignOnboardingHandler implements ICommandHandler<
     private readonly prismaService: PrismaService,
     private readonly notificationService: NotificationService,
     private readonly mailService: MailService,
+    private readonly subordinateCheck: SubordinateCheckService,
   ) {}
 
   async execute(command: AssignOnboardingCommand): Promise<IdResponseDto> {
+    const actorRole = RequestContextService.getUserRole();
+    if (MANAGERIAL_ROLES.includes(actorRole as never)) {
+      const ok = await this.subordinateCheck.isSubordinate(
+        command.assignedById,
+        command.assignedToId,
+      );
+      if (!ok) {
+        throw new ApplicationException(
+          'You can only assign onboarding to your direct or indirect subordinates',
+          403,
+          'ONBOARDING_NOT_YOUR_SUBORDINATE',
+        );
+      }
+    }
+
     const onboardingId = await this.repository.transaction(async () => {
       const template = await this.templateRepository.findById(
         command.templateId,

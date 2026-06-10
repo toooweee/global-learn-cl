@@ -2,6 +2,7 @@ import { Inject } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 import { RequestContextService } from '@/libs/application/context/app-request-context';
+import { CourseStatus } from '@/modules/education/course/course.types';
 import { IdResponseDto } from '@/libs/api/dto';
 import { CourseEntity } from '@/modules/education/course/domain/course.entity';
 import { CreateCourseCommand } from './create-course.command';
@@ -26,6 +27,7 @@ export class CreateCourseCommandHandler implements ICommandHandler<
       throw new ApplicationException('Unauthorized', 401, 'UNAUTHORIZED');
     }
 
+    const isAdmin = RequestContextService.getUserRole() === 'admin';
     const course = CourseEntity.create({
       name: command.name,
       description: command.description,
@@ -34,6 +36,7 @@ export class CreateCourseCommandHandler implements ICommandHandler<
       divisionId: command.divisionId,
       authorId,
       coverId: command.coverId,
+      status: isAdmin ? CourseStatus.PUBLISHED : CourseStatus.DRAFT,
     });
 
     await this.repository.save(course);

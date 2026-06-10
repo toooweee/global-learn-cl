@@ -1,7 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, Length } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Length } from 'class-validator';
 
 export class CompleteRegistrationRequestDto {
+  @ApiProperty({
+    example: 'abc123...',
+    description: 'Invite token from email link',
+  })
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+
   @ApiProperty({ example: 'johndoe@company.com' })
   @IsEmail()
   @IsNotEmpty()

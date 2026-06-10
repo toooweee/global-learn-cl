@@ -2,6 +2,7 @@ import { PaginatedParams, PaginatedQuery } from '@/libs/application/query.base';
 import { CourseScope } from '@/modules/education/course/course.types';
 
 export class FindCoursesQuery extends PaginatedQuery {
+  readonly search?: string;
   readonly authorId?: string;
   readonly scope?: CourseScope;
   readonly departmentId?: string;
@@ -11,6 +12,7 @@ export class FindCoursesQuery extends PaginatedQuery {
 
   constructor(props: PaginatedParams<FindCoursesQuery>) {
     super(props);
+    this.search = props.search;
     this.authorId = props.authorId;
     this.scope = props.scope;
     this.departmentId = props.departmentId;

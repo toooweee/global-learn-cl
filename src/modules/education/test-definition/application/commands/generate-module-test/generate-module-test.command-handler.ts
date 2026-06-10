@@ -34,13 +34,22 @@ export class GenerateModuleTestCommandHandler implements ICommandHandler<
       );
     }
 
-    const pool = await this.prismaService.client.courseQuestion.findMany({
+    let pool = await this.prismaService.client.courseQuestion.findMany({
       where: { courseId: command.courseId, moduleId: command.moduleId },
       select: { id: true },
     });
+
+    // Fall back to all course questions when none are scoped to this module
+    if (pool.length === 0) {
+      pool = await this.prismaService.client.courseQuestion.findMany({
+        where: { courseId: command.courseId },
+        select: { id: true },
+      });
+    }
+
     if (pool.length === 0) {
       throw new ApplicationException(
-        'Question bank is empty for this module',
+        'Question bank is empty for this course',
         422,
         'QUESTION_BANK_EMPTY',
       );

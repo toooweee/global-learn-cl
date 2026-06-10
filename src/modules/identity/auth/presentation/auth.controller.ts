@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
+  ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiOkResponse,
@@ -25,12 +26,16 @@ import { RegisterRequestDto } from '@/modules/identity/auth/presentation/dto/reg
 import { LoginRequestDto } from '@/modules/identity/auth/presentation/dto/login.request.dto';
 import { CompleteRegistrationRequestDto } from '@/modules/identity/auth/presentation/dto/complete-registration.request.dto';
 import { ChangePasswordRequestDto } from '@/modules/identity/auth/presentation/dto/change-password.request.dto';
+import { ForgotPasswordRequestDto } from '@/modules/identity/auth/presentation/dto/forgot-password.request.dto';
+import { ResetPasswordRequestDto } from '@/modules/identity/auth/presentation/dto/reset-password.request.dto';
 import { RegisterCommand } from '@/modules/identity/auth/application/register/register.command';
 import { LoginCommand } from '@/modules/identity/auth/application/login/login.command';
 import { CompleteRegistrationCommand } from '@/modules/identity/auth/application/complete-registration/complete-registration.command';
 import { ChangePasswordCommand } from '@/modules/identity/auth/application/change-password/change-password.command';
 import { LogoutCommand } from '@/modules/identity/auth/application/logout/logout.command';
 import { RefreshTokenCommand } from '@/modules/identity/auth/application/refresh-tokens/refresh-token.command';
+import { ForgotPasswordCommand } from '@/modules/identity/auth/application/forgot-password/forgot-password.command';
+import { ResetPasswordCommand } from '@/modules/identity/auth/application/reset-password/reset-password.command';
 import type { TokenIssuance } from '@/modules/identity/token/token.service';
 import { cookieConstants } from '@/libs/api/decorators/cookie.constants';
 
@@ -65,10 +70,12 @@ export class AuthController {
     );
   }
 
-  @ApiOperation({ summary: 'Register a new employee (Admin only)' })
+  @ApiOperation({
+    summary: 'Register a new employee (Admin only), sends invite email',
+  })
   @ApiCreatedResponse({ type: IdResponseDto })
   @ApiConflictResponse({})
-  @Roles('Admin')
+  @Roles('admin')
   @Post('register')
   async register(@Body() body: RegisterRequestDto): Promise<IdResponseDto> {
     const userId = await this.commandBus.execute<RegisterCommand, string>(
@@ -77,15 +84,47 @@ export class AuthController {
     return new IdResponseDto(userId);
   }
 
-  @ApiOperation({ summary: 'Set password for invited employee' })
+  @ApiOperation({
+    summary: 'Complete registration using invite token from email',
+  })
   @ApiOkResponse()
+  @ApiBadRequestResponse({ description: 'Invalid or expired invite token' })
   @Public()
   @Post('complete-registration')
   async completeRegistration(
     @Body() body: CompleteRegistrationRequestDto,
   ): Promise<void> {
     await this.commandBus.execute<CompleteRegistrationCommand, void>(
-      new CompleteRegistrationCommand(body),
+      new CompleteRegistrationCommand({
+        token: body.token,
+        email: body.email,
+        newPassword: body.newPassword,
+      }),
+    );
+  }
+
+  @ApiOperation({ summary: 'Request password reset email' })
+  @ApiOkResponse({ description: 'Email sent if account exists' })
+  @Public()
+  @Post('forgot-password')
+  async forgotPassword(@Body() body: ForgotPasswordRequestDto): Promise<void> {
+    await this.commandBus.execute<ForgotPasswordCommand, void>(
+      new ForgotPasswordCommand({ email: body.email }),
+    );
+  }
+
+  @ApiOperation({ summary: 'Reset password using token from email' })
+  @ApiOkResponse()
+  @ApiBadRequestResponse({ description: 'Invalid or expired reset token' })
+  @Public()
+  @Post('reset-password')
+  async resetPassword(@Body() body: ResetPasswordRequestDto): Promise<void> {
+    await this.commandBus.execute<ResetPasswordCommand, void>(
+      new ResetPasswordCommand({
+        token: body.token,
+        email: body.email,
+        newPassword: body.newPassword,
+      }),
     );
   }
 

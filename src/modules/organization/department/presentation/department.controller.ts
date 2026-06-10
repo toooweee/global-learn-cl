@@ -42,7 +42,7 @@ export class DepartmentController {
 
   @ApiOperation({ summary: 'Create department (Admin only)' })
   @ApiCreatedResponse({ type: IdResponseDto })
-  @Roles('Admin')
+  @Roles('admin')
   @Post()
   async create(
     @Body() body: CreateDepartmentRequestDto,
@@ -85,7 +85,7 @@ export class DepartmentController {
   @ApiOperation({ summary: 'Update department (Admin only)' })
   @ApiOkResponse()
   @ApiNotFoundResponse()
-  @Roles('Admin')
+  @Roles('admin')
   @Patch(':id')
   async update(
     @Param() params: IdRequestDto,
@@ -99,7 +99,7 @@ export class DepartmentController {
   @ApiOperation({ summary: 'Delete department (Admin only)' })
   @ApiOkResponse()
   @ApiNotFoundResponse()
-  @Roles('Admin')
+  @Roles('admin')
   @Delete(':id')
   async remove(@Param() params: IdRequestDto): Promise<void> {
     await this.commandBus.execute<DeleteDepartmentCommand, void>(

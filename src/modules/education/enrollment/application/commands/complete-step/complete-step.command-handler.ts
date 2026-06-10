@@ -2,6 +2,7 @@ import { Inject } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 import { PrismaService } from '@/infra/prisma/prisma.service';
+import { EnrollmentStatus } from '@generated/client';
 import { CompleteStepCommand } from './complete-step.command';
 import {
   ENROLLMENT_REPOSITORY,
@@ -43,5 +44,20 @@ export class CompleteStepCommandHandler implements ICommandHandler<
     }
 
     await this.repository.save(enrollment);
+
+    // Auto-issue certificate when course is completed
+    if (enrollment.getProps().status === EnrollmentStatus.COMPLETED) {
+      const completedAt = enrollment.getProps().completedAt ?? new Date();
+      await this.prismaService.client.courseCertificate.upsert({
+        where: { enrollmentId: enrollment.id },
+        create: {
+          enrollmentId: enrollment.id,
+          employeeId: props.employeeId,
+          courseId: props.courseId,
+          issuedAt: completedAt,
+        },
+        update: {},
+      });
+    }
   }
 }

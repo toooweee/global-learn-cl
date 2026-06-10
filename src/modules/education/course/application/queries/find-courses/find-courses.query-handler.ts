@@ -8,6 +8,7 @@ import {
   EnrollmentProgressDto,
 } from '@/modules/education/course/presentation/dto/course.response.dto';
 import { FindCoursesQuery } from './find-courses.query';
+import { COURSE_CREATOR_ROLES } from '@/libs/auth/roles.constants';
 
 @QueryHandler(FindCoursesQuery)
 export class FindCoursesQueryHandler implements IQueryHandler<
@@ -21,14 +22,26 @@ export class FindCoursesQueryHandler implements IQueryHandler<
   ): Promise<Paginated<CourseSummaryResponseDto>> {
     const userId = RequestContextService.getUserId();
 
-    const where: Record<string, unknown> = {};
-    if (query.authorId) where.authorId = query.authorId;
-    if (query.scope) where.scope = query.scope;
-    if (query.departmentId) where.departmentId = query.departmentId;
-    if (query.divisionId) where.divisionId = query.divisionId;
-    if (!query.includeArchived) where.isArchived = false;
+    const userRole = RequestContextService.getUserRole();
+    const isAdmin = userRole === 'admin';
 
-    if (query.visibleToMe && userId) {
+    // Course creators (dept_head / division_head) can see their own non-published courses
+    const isContentCreator =
+      COURSE_CREATOR_ROLES.includes(userRole as never) && !isAdmin;
+    const where: Record<string, unknown> = {};
+    if (!query.includeArchived) where.isArchived = false;
+    if (query.search) {
+      where.name = { contains: query.search, mode: 'insensitive' };
+    }
+
+    if (isAdmin) {
+      // Admin: apply all explicit filters as-is, sees all statuses
+      if (query.authorId) where.authorId = query.authorId;
+      if (query.scope) where.scope = query.scope;
+      if (query.departmentId) where.departmentId = query.departmentId;
+      if (query.divisionId) where.divisionId = query.divisionId;
+    } else if (userId) {
+      // Non-admins: only PUBLISHED courses + their own drafts/pending/rejected
       const employee = await this.prismaService.client.employee.findUnique({
         where: { id: userId },
         select: {
@@ -36,20 +49,26 @@ export class FindCoursesQueryHandler implements IQueryHandler<
           division: { select: { departmentId: true } },
         },
       });
+      const scopeFilter = employee
+        ? [
+            { scope: 'ALL' },
+            {
+              scope: 'DEPARTMENT',
+              departmentId: employee.division?.departmentId ?? null,
+            },
+            { scope: 'DIVISION', divisionId: employee.divisionId },
+          ]
+        : [{ scope: 'ALL' }];
 
-      if (employee) {
-        where.OR = [
-          { scope: 'ALL' },
-          {
-            scope: 'DEPARTMENT',
-            departmentId: employee.division?.departmentId ?? null,
-          },
-          { scope: 'DIVISION', divisionId: employee.divisionId },
-        ];
-        delete where.scope;
-        delete where.departmentId;
-        delete where.divisionId;
-      }
+      where.OR = [
+        // PUBLISHED within their scope
+        { status: 'PUBLISHED', AND: [{ OR: scopeFilter }] },
+        // Their own non-published courses (course creators only)
+        ...(isContentCreator
+          ? [{ authorId: userId, status: { not: 'PUBLISHED' } }]
+          : []),
+      ];
+      if (query.authorId) where.authorId = query.authorId;
     }
 
     const [count, rows] = await Promise.all([
@@ -68,6 +87,8 @@ export class FindCoursesQueryHandler implements IQueryHandler<
           createdAt: true,
           updatedAt: true,
           scope: true,
+          status: true,
+          reviewNote: true,
           departmentId: true,
           divisionId: true,
           isArchived: true,
@@ -135,6 +156,8 @@ export class FindCoursesQueryHandler implements IQueryHandler<
           authorId: row.authorId,
           coverId: row.coverId,
           isArchived: row.isArchived,
+          status: row.status,
+          reviewNote: row.reviewNote ?? undefined,
           scopeInfo: new CourseScopeDto({
             scope: row.scope,
             departmentId: row.departmentId ?? undefined,

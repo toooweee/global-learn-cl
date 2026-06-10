@@ -39,7 +39,7 @@ export class RoleController {
 
   @ApiOperation({ summary: 'Create role (Admin only)' })
   @ApiCreatedResponse({ type: IdResponseDto })
-  @Roles('Admin')
+  @Roles('admin')
   @Post()
   async create(@Body() body: CreateRoleRequestDto): Promise<IdResponseDto> {
     const id = await this.commandBus.execute<CreateRoleCommand, string>(
@@ -79,7 +79,7 @@ export class RoleController {
   @ApiOperation({ summary: 'Delete role (Admin only)' })
   @ApiOkResponse()
   @ApiNotFoundResponse()
-  @Roles('Admin')
+  @Roles('admin')
   @Delete(':id')
   async remove(@Param() params: IdRequestDto): Promise<void> {
     await this.commandBus.execute<DeleteRoleCommand, void>(

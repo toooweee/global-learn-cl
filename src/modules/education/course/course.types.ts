@@ -1,6 +1,6 @@
-import { CourseScope, StepType } from '@generated/client';
+import { CourseScope, CourseStatus, StepType } from '@generated/client';
 
-export { CourseScope };
+export { CourseScope, CourseStatus };
 
 export interface StepProps {
   id: string;
@@ -22,6 +22,8 @@ export interface CourseProps {
   name: string;
   description: string;
   scope: CourseScope;
+  status: CourseStatus;
+  reviewNote?: string;
   departmentId?: string;
   divisionId?: string;
   authorId: string;
@@ -36,6 +38,7 @@ export interface CreateCourseProps {
   name: string;
   description: string;
   scope?: CourseScope;
+  status?: CourseStatus;
   departmentId?: string;
   divisionId?: string;
   authorId: string;

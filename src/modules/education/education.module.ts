@@ -2,6 +2,10 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/infra/prisma/prisma.module';
 import { NotificationModule } from '@/modules/notifications/notification.module';
 import { MailModule } from '@/modules/mail/mail.module';
+import { EmployeeModule } from '@/modules/employee/employee.module';
+import { SubmitCourseForReviewCommandHandler } from '@/modules/education/course/application/commands/submit-course-for-review/submit-course-for-review.command-handler';
+import { PublishCourseCommandHandler } from '@/modules/education/course/application/commands/publish-course/publish-course.command-handler';
+import { RejectCourseCommandHandler } from '@/modules/education/course/application/commands/reject-course/reject-course.command-handler';
 
 // Course
 import { CourseMapper } from '@/modules/education/course/course.mapper';
@@ -44,6 +48,7 @@ import { CancelEnrollmentCommandHandler } from '@/modules/education/enrollment/a
 import { FindEnrollmentQueryHandler } from '@/modules/education/enrollment/application/queries/find-enrollment/find-enrollment.query-handler';
 import { FindMyEnrollmentsQueryHandler } from '@/modules/education/enrollment/application/queries/find-my-enrollments/find-my-enrollments.query-handler';
 import { FindEnrollmentsForCourseQueryHandler } from '@/modules/education/enrollment/application/queries/find-enrollments-for-course/find-enrollments-for-course.query-handler';
+import { BulkEnrollCommandHandler } from '@/modules/education/enrollment/application/commands/bulk-enroll/bulk-enroll.command-handler';
 import { EnrollmentController } from '@/modules/education/enrollment/presentation/enrollment.controller';
 
 // TestAttempt
@@ -95,8 +100,13 @@ import { FindCourseQuestionQueryHandler } from '@/modules/education/test-definit
 import { GetQuestionBankStatsQueryHandler } from '@/modules/education/test-definition/application/queries/get-question-bank-stats/get-question-bank-stats.query-handler';
 import { TestDefinitionController } from '@/modules/education/test-definition/presentation/test-definition.controller';
 
+// Certificate
+import { GetMyCertificatesQueryHandler } from '@/modules/education/certificate/application/queries/get-my-certificates/get-my-certificates.query-handler';
+import { GetCertificateQueryHandler } from '@/modules/education/certificate/application/queries/get-certificate/get-certificate.query-handler';
+import { CertificateController } from '@/modules/education/certificate/presentation/certificate.controller';
+
 @Module({
-  imports: [PrismaModule, NotificationModule, MailModule],
+  imports: [PrismaModule, NotificationModule, MailModule, EmployeeModule],
   controllers: [
     CourseController,
     CourseApplicationController,
@@ -104,6 +114,7 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     TestAttemptController,
     LessonController,
     TestDefinitionController,
+    CertificateController,
   ],
   providers: [
     // Course
@@ -122,6 +133,9 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     GetCoursesOverviewQueryHandler,
     GetCourseAnalyticsQueryHandler,
     ArchiveCourseCommandHandler,
+    SubmitCourseForReviewCommandHandler,
+    PublishCourseCommandHandler,
+    RejectCourseCommandHandler,
 
     // CourseApplication
     CourseApplicationMapper,
@@ -145,6 +159,7 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     FindEnrollmentQueryHandler,
     FindMyEnrollmentsQueryHandler,
     FindEnrollmentsForCourseQueryHandler,
+    BulkEnrollCommandHandler,
 
     // TestAttempt
     TestAttemptMapper,
@@ -189,6 +204,10 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
     FindCourseQuestionsQueryHandler,
     FindCourseQuestionQueryHandler,
     GetQuestionBankStatsQueryHandler,
+
+    // Certificate
+    GetMyCertificatesQueryHandler,
+    GetCertificateQueryHandler,
   ],
 })
 export class EducationModule {}
