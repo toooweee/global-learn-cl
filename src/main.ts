@@ -26,7 +26,7 @@ async function bootstrap() {
   setupSwagger(app);
 
   app.enableCors({
-    origin: [process.env.FRONTEND_URL, 'http://172.24.235.155:5173'],
+    origin: envService.get('FRONTEND_URL'),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });

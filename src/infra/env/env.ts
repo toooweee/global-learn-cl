@@ -19,6 +19,8 @@ export const EnvSchema = z.object({
 
   APP_URL: z.string().default('http://localhost:3001'),
 
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
+
   TEST_ADMIN_EMAIL: z.string(),
   TEST_ADMIN_PASSWORD: z.string(),
   TEST_EMPLOYEE_EMAIL: z.string(),
