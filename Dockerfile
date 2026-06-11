@@ -32,6 +32,10 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/prisma ./prisma
+# tsconfig + source prisma client so `prisma db seed` (runs via tsx) can resolve
+# the @generated/* path alias to ./generated/prisma
+COPY --from=build /app/tsconfig.json ./tsconfig.json
+COPY --from=build /app/generated ./generated
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
