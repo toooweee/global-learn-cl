@@ -29,14 +29,14 @@
 > (в опции «максимум CODE» очередь не входила; cron остаётся, текст диплома смягчаем).
 > Мелкие баги/@Roles — кодим. Порядок: сначала добить Трек 1 (клиент), затем этот трек с P1.
 
-## P1 — Redis-кэширование  `[ ]`  · Реш: CODE  ⟵ главный пункт для защиты
+## P1 — Redis-кэширование  `[x]`  · Реш: CODE  ⟵ главный пункт для защиты
 Диплом: разд. 4.3 + табл.39 (250–300→80–120 мс). Сейчас Redis не подключён (env есть, не читается).
-- [ ] Добавить deps: `@nestjs/cache-manager cache-manager cache-manager-redis-yet` (или `ioredis` + `cache-manager-ioredis-yet`). Сверить актуальность пакетов.
-- [ ] `src/infra/cache/cache.module.ts` — глобальный `CacheModule.registerAsync` на `REDIS_IP/REDIS_PORT` из `EnvService`. Импорт в `AppModule`.
-- [ ] Кэшировать чтения: список/карточка курсов (`FindCoursesQuery`,`FindCourseQuery`), оргструктура (departments/divisions/positions list+tree). TTL ~60с.
-- [ ] Инвалидация: сбрасывать ключи курса при create/update/delete/publish; оргструктуры — при их мутациях.
-- [ ] Проверка: лог SQL (`PrismaService`) — повторный GET не бьёт в БД.
-- Реш: ? · CODE = внедрить кэш (рек.) · DOC = убрать абзац про кэш из диплома
+- [x] Deps: `cache-manager` + `@nestjs/cache-manager` + `@keyv/redis` (поставил пользователь).
+- [x] `src/infra/cache/cache.module.ts` — глобальный `CacheModule.registerAsync` на `REDIS_IP/REDIS_PORT` из `EnvService`; `CacheService`-обёртка (namespace-версионирование). Импорт в `AppModule`.
+- [x] Кэшировать чтения (TTL 60с): `FindCoursesQuery`/`FindCourseQuery` (ключ per-user — встроен enrollment + scope), оргструктура departments/divisions/positions list + position-tree (глобальные ключи).
+- [x] Инвалидация в репозиториях (единая точка): `CoursePrismaRepository.save/delete` → bump `courses`; division/department/position repo `save/delete` → bump `org`.
+- [~] Проверка: юнит-тест `CacheService` (hit/miss/invalidate/изоляция ns) ✅ + `pnpm build`/`test` зелёные. Живой SQL-лог не прогнан — Redis в docker не проброшен на хост; проверить на `make dev`.
+- Реш: CODE (внедрено).
 
 ## P2 — Redis как фоновые задачи/очередь  `[ ]`  · Реш: DOC
 Диплом стр.249/895/1094. Сейчас фон = cron `@nestjs/schedule` (`OnboardingInactivityService`).
@@ -80,5 +80,10 @@
 
 ## Журнал прогресса
 <!-- дата — что сделано, односторочно -->
-- (пусто)
+- 2026-06-15 — P1 (Redis-кэш) сделан на ветке `feat/redis-cache`. `AppCacheModule` (@keyv/redis,
+  TTL 60с) + `CacheService` (namespace-версионирование для групповой инвалидации). Кэш: курсы
+  list+card (per-user ключ), оргструктура list+tree (глобальный). Инвалидация в репозиториях
+  (course → ns `courses`; division/department/position → ns `org`). Юнит-тест кэша + полный
+  `pnpm test` (50/50) + `pnpm build` зелёные. Живой замер SQL — на `make dev` (Redis в docker не
+  проброшен на хост). Дальше: P3 (PDF-сертификат), P4 (аудит), P5 (видео), мелкие баги/@Roles.
 </content>
