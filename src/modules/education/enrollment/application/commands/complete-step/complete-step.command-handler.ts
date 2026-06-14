@@ -8,6 +8,7 @@ import {
   ENROLLMENT_REPOSITORY,
   type EnrollmentRepositoryPort,
 } from '@/modules/education/enrollment/application/ports/enrollment.repository.port';
+import { CertificateIssuerService } from '@/modules/education/certificate/application/services/certificate-issuer.service';
 
 @CommandHandler(CompleteStepCommand)
 export class CompleteStepCommandHandler implements ICommandHandler<
@@ -18,6 +19,7 @@ export class CompleteStepCommandHandler implements ICommandHandler<
     @Inject(ENROLLMENT_REPOSITORY)
     private readonly repository: EnrollmentRepositoryPort,
     private readonly prismaService: PrismaService,
+    private readonly certificateIssuer: CertificateIssuerService,
   ) {}
 
   async execute(command: CompleteStepCommand): Promise<void> {
@@ -48,16 +50,20 @@ export class CompleteStepCommandHandler implements ICommandHandler<
     // Auto-issue certificate when course is completed
     if (enrollment.getProps().status === EnrollmentStatus.COMPLETED) {
       const completedAt = enrollment.getProps().completedAt ?? new Date();
-      await this.prismaService.client.courseCertificate.upsert({
-        where: { enrollmentId: enrollment.id },
-        create: {
-          enrollmentId: enrollment.id,
-          employeeId: props.employeeId,
-          courseId: props.courseId,
-          issuedAt: completedAt,
-        },
-        update: {},
-      });
+      const certificate =
+        await this.prismaService.client.courseCertificate.upsert({
+          where: { enrollmentId: enrollment.id },
+          create: {
+            enrollmentId: enrollment.id,
+            employeeId: props.employeeId,
+            courseId: props.courseId,
+            issuedAt: completedAt,
+          },
+          update: {},
+        });
+
+      // Render + store the PDF and link it (best-effort, never fails completion).
+      await this.certificateIssuer.issuePdf(certificate.id);
     }
   }
 }

@@ -43,12 +43,12 @@
 - DOC (рек., дёшево): переформулировать «фоновая обработка задач» → «планировщик cron»; Redis оставить только как кэш (см. P1).
 - CODE: внедрить BullMQ-очередь (нотификации/письма async). Дорого, не обязательно.
 
-## P3 — PDF-сертификат  `[ ]`  · Реш: CODE
-Диплом табл.24 поле `file_id (PDF)`. Сейчас `CourseCertificate` без `file_id`, PDF нет. Верификация по id есть.
-- [ ] Миграция: добавить `file_id UUID NULL FK→files (SET NULL)` в `course_certificates` (+ relation в schema).
-- [ ] Генерация PDF при выдаче (в `complete-step.command-handler.ts`, где создаётся сертификат) или ленивая по запросу. Либ: `pdfkit`/`@react-pdf` — выбрать лёгкую.
-- [ ] Залить PDF в MinIO (`FileStoragePort`), записать `file_id`. Отдавать presigned-URL в `CertificateResponseDto`.
-- Реш: ? · CODE = миграция+генерация PDF · DOC = убрать строку `file_id (PDF)` из табл.24, оставить «запись + верификация по id»
+## P3 — PDF-сертификат  `[x]`  · Реш: CODE
+Диплом табл.24 поле `file_id (PDF)`. Сделано на ветке `feat/certificate-pdf`.
+- [x] Миграция `certificate_pdf_file`: `file_id UUID NULL FK→files (SET NULL)` + relation `CertificatePdf`.
+- [x] Генерация при выдаче: `complete-step.command-handler` → `CertificateIssuerService.issuePdf` (best-effort). PDF — `CertificatePdfService` на `pdfkit` + забандленный DejaVu Sans (встроенные шрифты без кириллицы; ассеты копируются в `dist/src` через nest-cli).
+- [x] Заливка в MinIO (`FILE_STORAGE.upload`) → запись `files` → set `file_id`. Read-хэндлеры (`get-certificate`, `get-my-certificates`) отдают presigned `fileUrl` в `CertificateResponseDto`.
+- Реш: CODE (внедрено). Проверка: build + `pnpm test` (50/50) + смоук генерации PDF (валидный %PDF, DejaVu встроен, кириллица без ошибок).
 
 ## P4 — Аудит/журнал действий администратора  `[ ]`  · Реш: CODE
 Диплом стр.299/332/426. Сейчас нет таблицы/эндпоинтов; логи только в консоль.
@@ -86,4 +86,9 @@
   (course → ns `courses`; division/department/position → ns `org`). Юнит-тест кэша + полный
   `pnpm test` (50/50) + `pnpm build` зелёные. Живой замер SQL — на `make dev` (Redis в docker не
   проброшен на хост). Дальше: P3 (PDF-сертификат), P4 (аудит), P5 (видео), мелкие баги/@Roles.
+- 2026-06-15 — P3 (PDF-сертификат) сделан на ветке `feat/certificate-pdf`. Миграция `file_id`
+  (FK→files SET NULL); `pdfkit` + забандленный DejaVu Sans (кириллица); `CertificatePdfService`
+  (рендер) + `CertificateIssuerService` (генерация→MinIO→files→set file_id, best-effort) вызывается
+  из `complete-step`; read-хэндлеры отдают presigned `fileUrl`. nest-cli копирует .ttf в `dist/src`.
+  build + test (50/50) + смоук PDF зелёные. Дальше: P4 (аудит), P5 (видео), мелкие баги/@Roles.
 </content>

@@ -104,9 +104,18 @@ import { TestDefinitionController } from '@/modules/education/test-definition/pr
 import { GetMyCertificatesQueryHandler } from '@/modules/education/certificate/application/queries/get-my-certificates/get-my-certificates.query-handler';
 import { GetCertificateQueryHandler } from '@/modules/education/certificate/application/queries/get-certificate/get-certificate.query-handler';
 import { CertificateController } from '@/modules/education/certificate/presentation/certificate.controller';
+import { CertificatePdfService } from '@/modules/education/certificate/application/services/certificate-pdf.service';
+import { CertificateIssuerService } from '@/modules/education/certificate/application/services/certificate-issuer.service';
+import { FileModule } from '@/infra/file/file.module';
 
 @Module({
-  imports: [PrismaModule, NotificationModule, MailModule, EmployeeModule],
+  imports: [
+    PrismaModule,
+    NotificationModule,
+    MailModule,
+    EmployeeModule,
+    FileModule,
+  ],
   controllers: [
     CourseController,
     CourseApplicationController,
@@ -208,6 +217,8 @@ import { CertificateController } from '@/modules/education/certificate/presentat
     // Certificate
     GetMyCertificatesQueryHandler,
     GetCertificateQueryHandler,
+    CertificatePdfService,
+    CertificateIssuerService,
   ],
 })
 export class EducationModule {}

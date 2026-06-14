@@ -108,6 +108,7 @@ Table files {
   onboardingTemplates onboarding_templates [not null]
   onboardingTemplateSteps onboarding_template_steps [not null]
   lessonVideos lessons [not null]
+  certificates course_certificates [not null]
 }
 
 Table courses {
@@ -307,10 +308,12 @@ Table course_certificates {
   enrollmentId String [unique, not null]
   employeeId String [not null]
   courseId String [not null]
+  fileId String
   issuedAt DateTime [not null]
   enrollment course_enrollments [not null]
   employee employees [not null]
   course courses [not null]
+  file files
 }
 
 Table onboarding_templates {
@@ -567,6 +570,8 @@ Ref: course_certificates.enrollmentId - course_enrollments.id [delete: Cascade]
 Ref: course_certificates.employeeId > employees.id [delete: Cascade]
 
 Ref: course_certificates.courseId > courses.id [delete: Cascade]
+
+Ref: course_certificates.fileId > files.id [delete: Set Null]
 
 Ref: onboarding_templates.positionId > positions.id
 

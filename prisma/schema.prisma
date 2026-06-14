@@ -151,6 +151,7 @@ model File {
   onboardingTemplates     OnboardingTemplate[]     @relation("OnboardingTemplateCover")
   onboardingTemplateSteps OnboardingTemplateStep[] @relation("OnboardingTemplateStepCover")
   lessonVideos            Lesson[]                 @relation("LessonVideo")
+  certificates            CourseCertificate[]      @relation("CertificatePdf")
 
   @@map("files")
 }
@@ -426,11 +427,13 @@ model CourseCertificate {
   enrollmentId String   @unique @map("enrollment_id") @db.Uuid
   employeeId   String   @map("employee_id") @db.Uuid
   courseId     String   @map("course_id") @db.Uuid
+  fileId       String?  @map("file_id") @db.Uuid
   issuedAt     DateTime @map("issued_at") @db.Timestamptz
 
   enrollment CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   course     Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  file       File?            @relation("CertificatePdf", fields: [fileId], references: [id], onDelete: SetNull)
 
   @@index([employeeId])
   @@map("course_certificates")

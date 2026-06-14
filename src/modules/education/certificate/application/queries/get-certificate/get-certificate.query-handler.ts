@@ -1,6 +1,11 @@
+import { Inject } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 import { PrismaService } from '@/infra/prisma/prisma.service';
+import {
+  FILE_STORAGE,
+  type FileStoragePort,
+} from '@/libs/application/ports/file-storage.port';
 import { CertificateResponseDto } from '@/modules/education/certificate/presentation/dto/certificate.response.dto';
 import { GetCertificateQuery } from './get-certificate.query';
 
@@ -9,7 +14,11 @@ export class GetCertificateQueryHandler implements IQueryHandler<
   GetCertificateQuery,
   CertificateResponseDto
 > {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    @Inject(FILE_STORAGE)
+    private readonly fileStorage: FileStoragePort,
+  ) {}
 
   async execute(query: GetCertificateQuery): Promise<CertificateResponseDto> {
     const cert = await this.prismaService.client.courseCertificate.findUnique({
@@ -17,6 +26,7 @@ export class GetCertificateQueryHandler implements IQueryHandler<
       include: {
         employee: { select: { fullname: true } },
         course: { select: { name: true } },
+        file: { select: { url: true } },
       },
     });
 
@@ -28,6 +38,10 @@ export class GetCertificateQueryHandler implements IQueryHandler<
       );
     }
 
+    const fileUrl = cert.file
+      ? await this.fileStorage.getSignedUrl(cert.file.url)
+      : undefined;
+
     return new CertificateResponseDto({
       id: cert.id,
       enrollmentId: cert.enrollmentId,
@@ -36,6 +50,7 @@ export class GetCertificateQueryHandler implements IQueryHandler<
       courseId: cert.courseId,
       courseName: cert.course.name,
       issuedAt: cert.issuedAt,
+      fileUrl,
     });
   }
 }
