@@ -6,6 +6,7 @@ import { PrismaService } from '@/infra/prisma/prisma.service';
 import { DepartmentMapper } from '@/modules/organization/department/department.mapper';
 import { AggregateId } from '@/libs/ddd/entity.base';
 import { None, Option, Some } from 'oxide.ts';
+import { CacheService, CACHE_NS } from '@/infra/cache/cache.service';
 
 @Injectable()
 export class DepartmentPrismaRepository
@@ -15,6 +16,7 @@ export class DepartmentPrismaRepository
   constructor(
     prismaService: PrismaService,
     private readonly mapper: DepartmentMapper,
+    private readonly cache: CacheService,
   ) {
     super(prismaService);
   }
@@ -26,6 +28,7 @@ export class DepartmentPrismaRepository
       create: data,
       update: { name: data.name, updatedAt: data.updatedAt },
     });
+    await this.cache.invalidate(CACHE_NS.ORG);
   }
 
   async findById(id: AggregateId): Promise<Option<DepartmentEntity>> {
@@ -40,5 +43,6 @@ export class DepartmentPrismaRepository
 
   async delete(entity: DepartmentEntity): Promise<void> {
     await this.db.department.delete({ where: { id: entity.id } });
+    await this.cache.invalidate(CACHE_NS.ORG);
   }
 }

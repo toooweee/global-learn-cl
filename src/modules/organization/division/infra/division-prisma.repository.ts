@@ -6,6 +6,7 @@ import { PrismaService } from '@/infra/prisma/prisma.service';
 import { DivisionMapper } from '@/modules/organization/division/division.mapper';
 import { AggregateId } from '@/libs/ddd/entity.base';
 import { None, Option, Some } from 'oxide.ts';
+import { CacheService, CACHE_NS } from '@/infra/cache/cache.service';
 
 @Injectable()
 export class DivisionPrismaRepository
@@ -15,6 +16,7 @@ export class DivisionPrismaRepository
   constructor(
     prismaService: PrismaService,
     private readonly mapper: DivisionMapper,
+    private readonly cache: CacheService,
   ) {
     super(prismaService);
   }
@@ -30,6 +32,7 @@ export class DivisionPrismaRepository
         updatedAt: data.updatedAt,
       },
     });
+    await this.cache.invalidate(CACHE_NS.ORG);
   }
 
   async findById(id: AggregateId): Promise<Option<DivisionEntity>> {
@@ -44,5 +47,6 @@ export class DivisionPrismaRepository
 
   async delete(entity: DivisionEntity): Promise<void> {
     await this.db.division.delete({ where: { id: entity.id } });
+    await this.cache.invalidate(CACHE_NS.ORG);
   }
 }

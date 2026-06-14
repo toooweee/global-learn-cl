@@ -15,6 +15,17 @@ const makePrisma = () => ({
   },
 });
 
+// CacheService stub: getOrSet just runs the factory (cache miss every time).
+const passthroughCache = {
+  getOrSet: (
+    _ns: string,
+    _parts: unknown[],
+    _ttl: number,
+    factory: () => unknown,
+  ) => factory(),
+  invalidate: jest.fn(),
+};
+
 describe('Position query handlers', () => {
   let prisma: ReturnType<typeof makePrisma>;
 
@@ -48,7 +59,10 @@ describe('Position query handlers', () => {
       const data = [{ id: 'pos-1', name: 'Директор', parentId: null }];
       prisma.client.position.count.mockResolvedValue(1);
       prisma.client.position.findMany.mockResolvedValue(data);
-      const handler = new FindPositionsQueryHandler(prisma as never);
+      const handler = new FindPositionsQueryHandler(
+        prisma as never,
+        passthroughCache as never,
+      );
 
       const result = await handler.execute(
         new FindPositionsQuery({ limit: 20, page: 1 }),
@@ -76,7 +90,10 @@ describe('Position query handlers', () => {
           ],
         },
       ]);
-      const handler = new GetPositionTreeQueryHandler(prisma as never);
+      const handler = new GetPositionTreeQueryHandler(
+        prisma as never,
+        passthroughCache as never,
+      );
 
       const tree = await handler.execute(new GetPositionTreeQuery());
 

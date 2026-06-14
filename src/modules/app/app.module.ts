@@ -2,6 +2,7 @@ import { Module, Provider } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { EnvModule } from '@/infra/env/env.module';
 import { PrismaModule } from '@/infra/prisma/prisma.module';
+import { AppCacheModule } from '@/infra/cache/cache.module';
 import { RequestContextModule } from 'nestjs-request-context';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ContextInterceptor } from '@/libs/application/context/context.interceptor';
@@ -42,6 +43,7 @@ const guards: Provider[] = [
     RequestContextModule,
     EnvModule,
     PrismaModule,
+    AppCacheModule,
     UserModule,
     AuthModule,
     RoleModule,

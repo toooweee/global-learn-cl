@@ -9,20 +9,51 @@ import {
 } from '@/modules/education/course/presentation/dto/course.response.dto';
 import { FindCoursesQuery } from './find-courses.query';
 import { COURSE_CREATOR_ROLES } from '@/libs/auth/roles.constants';
+import { CacheService, CACHE_NS, CACHE_TTL } from '@/infra/cache/cache.service';
 
 @QueryHandler(FindCoursesQuery)
 export class FindCoursesQueryHandler implements IQueryHandler<
   FindCoursesQuery,
   Paginated<CourseSummaryResponseDto>
 > {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly cache: CacheService,
+  ) {}
 
   async execute(
     query: FindCoursesQuery,
   ): Promise<Paginated<CourseSummaryResponseDto>> {
     const userId = RequestContextService.getUserId();
-
     const userRole = RequestContextService.getUserRole();
+
+    // Cached per (user, role, filters) — the list embeds this user's enrollment
+    // progress and is visibility-scoped, so the key must be user-specific.
+    return this.cache.getOrSet(
+      CACHE_NS.COURSES,
+      [
+        'list',
+        userId,
+        userRole,
+        query.includeArchived,
+        query.search,
+        query.authorId,
+        query.scope,
+        query.departmentId,
+        query.divisionId,
+        query.limit,
+        query.page,
+      ],
+      CACHE_TTL.COURSES,
+      () => this.queryCourses(query, userId, userRole),
+    );
+  }
+
+  private async queryCourses(
+    query: FindCoursesQuery,
+    userId: string | undefined,
+    userRole: string | undefined,
+  ): Promise<Paginated<CourseSummaryResponseDto>> {
     const isAdmin = userRole === 'admin';
 
     // Course creators (dept_head / division_head) can see their own non-published courses

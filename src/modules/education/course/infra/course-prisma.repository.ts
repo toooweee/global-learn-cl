@@ -12,6 +12,7 @@ import {
   courseInclude,
 } from '@/modules/education/course/course.mapper';
 import { Paginated } from '@/libs/application/query.base';
+import { CacheService, CACHE_NS } from '@/infra/cache/cache.service';
 
 @Injectable()
 export class CoursePrismaRepository
@@ -21,6 +22,7 @@ export class CoursePrismaRepository
   constructor(
     prismaService: PrismaService,
     private readonly mapper: CourseMapper,
+    private readonly cache: CacheService,
   ) {
     super(prismaService);
   }
@@ -92,6 +94,8 @@ export class CoursePrismaRepository
         },
       },
     });
+
+    await this.cache.invalidate(CACHE_NS.COURSES);
   }
 
   async findById(id: string): Promise<Option<CourseEntity>> {
@@ -125,5 +129,6 @@ export class CoursePrismaRepository
 
   async delete(id: string): Promise<void> {
     await this.db.course.delete({ where: { id } });
+    await this.cache.invalidate(CACHE_NS.COURSES);
   }
 }

@@ -6,6 +6,7 @@ import { PrismaService } from '@/infra/prisma/prisma.service';
 import { PositionMapper } from '@/modules/organization/position/position.mapper';
 import { AggregateId } from '@/libs/ddd/entity.base';
 import { None, Option, Some } from 'oxide.ts';
+import { CacheService, CACHE_NS } from '@/infra/cache/cache.service';
 
 @Injectable()
 export class PositionPrismaRepository
@@ -15,6 +16,7 @@ export class PositionPrismaRepository
   constructor(
     prismaService: PrismaService,
     private readonly mapper: PositionMapper,
+    private readonly cache: CacheService,
   ) {
     super(prismaService);
   }
@@ -30,6 +32,7 @@ export class PositionPrismaRepository
         updatedAt: data.updatedAt,
       },
     });
+    await this.cache.invalidate(CACHE_NS.ORG);
   }
 
   async findById(id: AggregateId): Promise<Option<PositionEntity>> {
@@ -44,5 +47,6 @@ export class PositionPrismaRepository
 
   async delete(entity: PositionEntity): Promise<void> {
     await this.db.position.delete({ where: { id: entity.id } });
+    await this.cache.invalidate(CACHE_NS.ORG);
   }
 }

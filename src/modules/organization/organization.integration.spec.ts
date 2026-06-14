@@ -5,6 +5,7 @@ import { None, Option, Some } from 'oxide.ts';
 import { Department } from '@generated/client';
 import { Paginated } from '@/libs/application/query.base';
 import { PrismaService } from '@/infra/prisma/prisma.service';
+import { CacheService } from '@/infra/cache/cache.service';
 import { DepartmentMapper } from '@/modules/organization/department/department.mapper';
 import { DepartmentEntity } from '@/modules/organization/department/domain/department.entity';
 import {
@@ -86,6 +87,19 @@ describe('Organization module (integration)', () => {
       providers: [
         DepartmentMapper,
         { provide: PrismaService, useValue: fakePrisma },
+        {
+          // passthrough cache — getOrSet runs the factory, invalidate is a no-op
+          provide: CacheService,
+          useValue: {
+            getOrSet: (
+              _ns: string,
+              _parts: unknown[],
+              _ttl: number,
+              factory: () => unknown,
+            ) => factory(),
+            invalidate: async () => {},
+          },
+        },
         {
           provide: DEPARTMENT_REPOSITORY,
           useFactory: (mapper: DepartmentMapper) =>

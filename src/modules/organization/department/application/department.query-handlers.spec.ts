@@ -13,6 +13,17 @@ const makePrisma = () => ({
   },
 });
 
+// CacheService stub: getOrSet just runs the factory (cache miss every time).
+const passthroughCache = {
+  getOrSet: (
+    _ns: string,
+    _parts: unknown[],
+    _ttl: number,
+    factory: () => unknown,
+  ) => factory(),
+  invalidate: jest.fn(),
+};
+
 describe('Department query handlers', () => {
   let prisma: ReturnType<typeof makePrisma>;
 
@@ -49,7 +60,10 @@ describe('Department query handlers', () => {
       const data = [{ id: 'dep-1', name: 'Маркетинг' }];
       prisma.client.department.count.mockResolvedValue(1);
       prisma.client.department.findMany.mockResolvedValue(data);
-      const handler = new FindDepartmentsQueryHandler(prisma as never);
+      const handler = new FindDepartmentsQueryHandler(
+        prisma as never,
+        passthroughCache as never,
+      );
 
       const result = await handler.execute(
         new FindDepartmentsQuery({ limit: 20, page: 1 }),
