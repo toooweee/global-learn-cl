@@ -25,8 +25,8 @@ export class SendOnboardingChatMessageHandler implements ICommandHandler<
   async execute(
     command: SendOnboardingChatMessageCommand,
   ): Promise<IdResponseDto> {
-    const { messageId, chatId, messageProps } =
-      await this.chatRepository.transaction(async () => {
+    const { messageId, messageProps } = await this.chatRepository.transaction(
+      async () => {
         const onboarding = await this.onboardingRepository.findById(
           command.onboardingId,
         );
@@ -58,10 +58,11 @@ export class SendOnboardingChatMessageHandler implements ICommandHandler<
         });
         await this.chatRepository.save(c);
 
-        return { messageId: message.id, chatId: c.id, messageProps: message };
-      });
+        return { messageId: message.id, messageProps: message };
+      },
+    );
 
-    this.chatGateway.sendToChat(chatId, {
+    this.chatGateway.sendToChat(command.onboardingId, {
       id: messageProps.id,
       senderId: messageProps.senderId,
       body: messageProps.body,

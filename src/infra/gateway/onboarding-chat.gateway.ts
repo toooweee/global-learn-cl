@@ -8,6 +8,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Server, Socket } from 'socket.io';
+import { extractWsToken } from './ws-auth';
 
 @Injectable()
 @WebSocketGateway({ cors: { origin: '*' }, namespace: 'chat' })
@@ -20,7 +21,7 @@ export class OnboardingChatGateway
 
   async handleConnection(client: Socket): Promise<void> {
     try {
-      const token = client.handshake.auth?.token as string | undefined;
+      const token = extractWsToken(client);
       if (!token) {
         client.disconnect();
         return;
@@ -33,20 +34,26 @@ export class OnboardingChatGateway
 
   handleDisconnect(_client: Socket): void {}
 
+  // Rooms are keyed by onboardingId (chat is 1:1 with an onboarding), which is
+  // the only id the client knows — the internal chatId is never exposed to it.
   @SubscribeMessage('subscribe')
   async handleSubscribe(
     client: Socket,
-    payload: { chatId: string },
+    payload: { onboardingId: string },
   ): Promise<void> {
-    if (payload?.chatId) {
-      await client.join(`chat:${payload.chatId}`);
+    if (payload?.onboardingId) {
+      await client.join(`chat:${payload.onboardingId}`);
     }
   }
 
   sendToChat(
-    chatId: string,
+    onboardingId: string,
     message: { id: string; senderId: string; body: string; createdAt: Date },
   ): void {
-    this.server.to(`chat:${chatId}`).emit('message:created', message);
+    // Include onboardingId in the payload so the client can attribute the
+    // message to the right onboarding even when subscribed to several chats.
+    this.server
+      .to(`chat:${onboardingId}`)
+      .emit('message:created', { onboardingId, ...message });
   }
 }

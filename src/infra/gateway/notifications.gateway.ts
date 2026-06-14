@@ -7,6 +7,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Server, Socket } from 'socket.io';
+import { extractWsToken } from './ws-auth';
 
 @Injectable()
 @WebSocketGateway({ cors: { origin: '*' }, namespace: 'notifications' })
@@ -19,7 +20,7 @@ export class NotificationsGateway
 
   async handleConnection(client: Socket): Promise<void> {
     try {
-      const token = client.handshake.auth?.token as string | undefined;
+      const token = extractWsToken(client);
       if (!token) {
         client.disconnect();
         return;
