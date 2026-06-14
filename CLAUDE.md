@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`global-learn-api` — corporate LMS backend (NestJS + Prisma + PostgreSQL + Redis). Package manager is **pnpm** (lockfile is `pnpm-lock.yaml`, Node version pinned by `.nvmrc`).
+`global-learn-api` — corporate LMS backend (NestJS + Prisma + PostgreSQL + Redis + MinIO/S3). Package manager is **pnpm** (lockfile is `pnpm-lock.yaml`, Node version pinned by `.nvmrc`).
+
+Bounded contexts wired today: **identity** (`auth`, `user`, `role`, `token`), **organization** (`department`, `division`, `position`), **employee**, **education** (`course`, `course-application`, `enrollment`, `lesson`, `test-definition`, `test-attempt`, `certificate`), **onboarding** (`template`, `assignment`, `chat`), **files**, **notifications**, plus cross-cutting **mail** and a WebSocket **gateway**. See `CHECKLIST.md` for the full per-module endpoint catalog (roles, response shapes, gaps).
 
 ## Common commands
 
@@ -24,7 +26,7 @@ pnpm prisma generate             # client emits to ./generated/prisma (NOT node_
 make dev                         # install + docker compose up + wait-db + migrate deploy + generate
 ```
 
-Local infra (`docker-compose.yaml` + `docker-compose.local.yaml`) brings up Postgres (host port `5434`), Redis, RedisInsight (`5540`), and MailHog (`1025`/`8025`). `.env` is required — copy from `.env.example`.
+Local infra (`docker-compose.yaml` + `docker-compose.local.yaml`) brings up Postgres (host port `5434`), Redis, RedisInsight (`5540`), MailHog (`1025`/`8025`), and MinIO (S3 object storage). `.env` is required — copy from `.env.example`.
 
 ## Architecture
 
@@ -93,12 +95,30 @@ It special-cases `DomainException`, `ApplicationException`, and Nest's `HttpExce
 
 ### Swagger
 
-`setupSwagger(app)` (`src/infra/configs/swagger.config.ts`) mounts the Swagger UI at **`/api/docs`** with `persistAuthorization: true`. Use `@ApiOperation`, `@ApiOkResponse`, `@ApiCreatedResponse`, `@ApiPaginatedResponse(Model)`, `@ApiNotFoundResponse`, `@ApiConflictResponse`, etc. on controllers.
+`setupSwagger(app)` (`src/infra/configs/swagger.config.ts`) mounts the Swagger UI at **`/api/docs`** with `persistAuthorization: true`. Use `@ApiOperation`, `@ApiOkResponse`, `@ApiCreatedResponse`, `@ApiPaginatedResponse(Model)`, `@ApiNotFoundResponse`, `@ApiConflictResponse`, etc. on controllers. Tag controllers with `@ApiTags('<group>')` so they group in the UI.
+
+### Auth & guards
+
+Authentication is **cookie-based JWT**, not `Authorization` headers. `AuthModule` issues an access + refresh token pair on login (`TokenService`, signed with `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET`); the controller writes them as httpOnly cookies via `cookieFactory` (`cookieConstants.ACCESS_TOKEN` / `REFRESH_TOKEN`). Refresh tokens are persisted per-device (`tokens` table, keyed by `userAgent`) so logout/refresh are device-scoped.
+
+Two **global** `APP_GUARD`s (order matters — registered in `AppModule`):
+
+1. **`JwtAuthGuard`** (`src/libs/auth/guards/jwt-auth.guard.ts`) — runs on every request unless the handler/class is marked `@Public()` (`IS_PUBLIC_KEY` metadata). Reads the access-token cookie, verifies it, and stashes `payload.sub` / `payload.role` on the request context via `RequestContextService.setUserId` / `setUserRole`. Throws `ApplicationException(401, 'UNAUTHORIZED')` when missing/invalid. **So every endpoint requires auth by default** — opt out with `@Public()`.
+2. **`RolesGuard`** (`src/libs/auth/guards/roles.guard.ts`) — enforces `@Roles(...)` metadata against the role on the context. No `@Roles` ⇒ any authenticated user.
+
+Helpers in `src/libs/auth/`:
+- `@Public()` — bypass `JwtAuthGuard`.
+- `@Roles('admin', 'division_head', …)` — restrict to roles. Role slugs live in `roles.constants.ts` (`ROLE.ADMIN = 'admin'`, `DEPARTMENT_HEAD`, `DIVISION_HEAD`, `SENIOR_MANAGER`, `MANAGER`) plus the role-bundle constants (`COURSE_CREATOR_ROLES`, `COURSE_ASSIGNER_ROLES`, `MANAGERIAL_ROLES`) and `roleFromPositionName(...)`.
+- `@CurrentUser()` — injects `{ userId, role }` (`CurrentUserPayload`) read from the request context.
+
+> **Role slugs are lowercase** (`admin`, `division_head`, …). Comparing against capitalized literals (e.g. `user.role !== 'Admin'`) is a bug — see `CHECKLIST.md` cross-cutting notes.
+
+WebSocket gateways (`socket.io`, `src/infra/gateway/`) authenticate separately: the client passes the JWT in `handshake.auth.token`, the gateway verifies it with `JwtService` and disconnects on failure. `OnboardingChatGateway` (namespace `chat`) rooms by `chat:<chatId>` and emits `message:created`; `NotificationsGateway` pushes per-user notifications.
 
 ### Other conventions
 
 - Path alias `@/*` → `src/*`; `@generated` / `@generated/*` → `generated/prisma`. Build relies on **`tsc-alias`** to rewrite these in emitted JS — don't drop it from the `build` script.
-- Env access goes through `EnvService.get(...)` backed by `EnvSchema` (Zod) in `src/infra/env/env.ts` (current vars: `PORT`, `REDIS_IP`, `REDIS_PORT`, `DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`, `SMTP_HOST`, `SMTP_PORT`). Validation is wired through `ConfigModule.forRoot({ validate: (env) => EnvSchema.parse(env) })` in `EnvModule`. Add new variables to the schema; never read `process.env` directly in app code. **`zod` is used only for env validation** — do not pull it into HTTP layer.
+- Env access goes through `EnvService.get(...)` backed by `EnvSchema` (Zod) in `src/infra/env/env.ts` (current vars: `PORT`; `REDIS_IP`, `REDIS_PORT`; `DATABASE_URL`; `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`; `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`; `APP_URL`, `FRONTEND_URL` (used to build invite / password-reset links in emails); `TEST_ADMIN_EMAIL`, `TEST_ADMIN_PASSWORD`, `TEST_EMPLOYEE_EMAIL`, `TEST_EMPLOYEE_PASSWORD` (seed + e2e creds); `MINIO_ENDPOINT`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_BUCKET_NAME`, `MINIO_REGION`). Validation is wired through `ConfigModule.forRoot({ validate: (env) => EnvSchema.parse(env) })` in `EnvModule`. Add new variables to the schema; never read `process.env` directly in app code. **`zod` is used only for env validation** — do not pull it into HTTP layer.
 - `oxide.ts` `Option<T>` is the convention for nullable repo lookups (`findById`, `findByEmail`, etc. return `Option<Entity>`).
 - HTTP DTOs use **`class-validator` + `class-transformer`**. A global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` and `ClassSerializerInterceptor` are wired in `src/main.ts`. Request DTOs live in `presentation/dto/*.request.dto.ts`; controllers accept them with bare `@Body() dto: SomeDto` / `@Param() dto: ...` / `@Query() dto: ...` (the pipe transforms+validates).
 - **Response DTO classes live in `src/libs/api/dto/`** and use plain explicit constructors (no `@Exclude()`/`@Expose()` — only fields assigned in the constructor make it to the wire). Conventions: `IdResponseDto` for create endpoints, `BaseResponseDto` (`id`, `createdAt`, `updatedAt` — extends `IdResponseDto`, ISO-serializes dates) as a base for resource read-models, `PaginatedResponseDto<T>` wrapping the repo's `Paginated<T>` shape (`count` / `limit` / `page` / `data`). Per-aggregate response DTOs live next to the controller in `presentation/dto/<thing>.response.dto.ts` and extend `BaseResponseDto`.
@@ -111,7 +131,9 @@ It special-cases `DomainException`, `ApplicationException`, and Nest's `HttpExce
 
 ### Module wiring
 
-`AppModule` imports `CqrsModule.forRoot()`, `RequestContextModule`, `EnvModule`, `PrismaModule`, plus the feature modules wired up so far (currently `UserModule` and `OnboardingModule`). It also registers `ContextInterceptor` as `APP_INTERCEPTOR` and `AllExceptionsFilter` as `APP_FILTER`. Many feature modules under `src/modules/education/*`, `employee`, `identity/auth`, `identity/token` exist as in-progress slices and are not all registered yet — when adding a new module, import it into `AppModule`.
+`AppModule` imports `CqrsModule.forRoot()`, `ScheduleModule.forRoot()` (`@nestjs/schedule` — cron jobs), `RequestContextModule`, `EnvModule`, `PrismaModule`, plus every feature module: `UserModule`, `AuthModule`, `RoleModule`, `OrganizationModule`, `EmployeeModule`, `OnboardingModule`, `FilesModule`, `EducationModule`, `GatewayModule`, `NotificationModule`, `MailModule`. It registers `ContextInterceptor` as `APP_INTERCEPTOR`, `AllExceptionsFilter` as `APP_FILTER`, and **two global `APP_GUARD`s — `JwtAuthGuard` then `RolesGuard`** (see «Auth & guards» below). When adding a new module, import it into `AppModule`.
+
+`OrganizationModule` and `EducationModule` are umbrella modules: each registers the controllers/handlers/mappers for several sibling aggregates (organization → department/division/position; education → course/course-application/enrollment/lesson/test-definition/test-attempt/certificate). `GatewayModule` is `@Global()` and exports `NotificationsGateway` + `OnboardingChatGateway` (socket.io); `MailModule` sends transactional email via SMTP (MailHog locally).
 
 > **`UserModule`** (`src/modules/identity/user/`) is the canonical small example: imports `PrismaModule` only (CQRS is global from `AppModule`); binds `USER_REPOSITORY` `Symbol` → `UserPrismaRepository`; registers `CreateUserCommandHandler`, `FindUserQueryHandler`, `FindUsersQueryHandler`, and `UserMapper` as providers; exposes `UserController` which dispatches via `CommandBus` / `QueryBus`. The repository port is `UserRepositoryPort extends RepositoryPort<UserEntity>` and adds `findByEmail(email): Promise<Option<UserEntity>>`. Files at the module root: `user.module.ts`, `user.types.ts` (props), `user.mapper.ts`.
 
@@ -121,28 +143,28 @@ It special-cases `DomainException`, `ApplicationException`, and Nest's `HttpExce
 
 Tables are grouped by bounded context. All PKs are `uuid`, all timestamps are `timestamptz`. The `@map`/`@@map` directives in `prisma/schema.prisma` give the actual `snake_case` table/column names.
 
-### Identity (`users`, `roles`, `user_roles`)
+### Identity (`users`, `roles`, `tokens`)
 
-- **`users`** — base account. Holds credentials (`email`, `hashed_password`) and is the parent of every persona table (`employees`, `clients`) via a shared PK. Cascade-deletes everything tied to the account.
-- **`roles`** — named application roles (admin, manager, employee, …). Unique on `name`.
-- **`user_roles`** — many-to-many join. Composite PK `(user_id, role_id)`; both sides cascade so deleting a user or role tears down assignments.
+- **`users`** — base account. Holds credentials (`email`, `hashed_password`) plus password-reset fields (`password_reset_token`, `password_reset_expires_at`), and is the 1:1 parent of `employees` via a shared PK. **A user has exactly one role** via `role_id` FK (`onDelete: Restrict`) — there is **no `user_roles` join table** any more (the role is single-valued). Cascade-deletes the `employee`, `tokens`, and `notifications` tied to the account.
+- **`roles`** — named application roles. Unique on `name`. Slugs match `roles.constants.ts` (`admin`, `department_head`, `division_head`, `senior_manager`, `manager`). One role → many users.
+- **`tokens`** — persisted refresh tokens, one per device. `hashed_token`, `user_agent`, `expires_at`; unique `(user_id, user_agent)` so re-login on the same device rotates the row; cascades on user delete. This is how logout/refresh stay device-scoped.
 
-### Organization (`departments`, `divisions`, `positions`, `employees`, `client_companies`, `clients`)
+> There are **no `clients` / `client_companies` tables** — the schema is internal-employee-only at present.
 
-- **`departments`** — top-level org unit (e.g. "Engineering"). Unique on `name`.
-- **`divisions`** — sub-unit under a department (e.g. "Platform"). FK → `departments.id`.
-- **`positions`** — job titles (e.g. "Backend Engineer"). Pure dictionary; an employee references at most one.
-- **`employees`** — internal staff profile. PK is also the FK to `users.id` (1:1 with the account). Carries `division_id` (required), `position_id` (optional), employment/dismissal dates, avatar, biography. Many feature aggregates point at `employees.id`: course authorship, course enrollments, test attempts, onboarding (both as assigner and assignee), and chat messages.
-- **`client_companies`** — external customer organizations.
-- **`clients`** — external (customer-side) user profile. Like `employees`, PK is also the FK to `users.id`; FK → `client_companies.id` for the employer.
+### Organization (`departments`, `divisions`, `positions`, `employees`)
+
+- **`departments`** — top-level org unit. Unique on `name`; has `is_active`.
+- **`divisions`** — sub-unit under a department. FK → `departments.id`; has `is_active`.
+- **`positions`** — job titles, now a **self-referential hierarchy**: `parent_id` → `positions.id` (`onDelete: SetNull`, relation `PositionHierarchy`). Drives the org-chart tree endpoints (`GET /positions/tree`, `/employees/me/subordinates/tree`). An employee references at most one position.
+- **`employees`** — internal staff profile. PK is also the FK to `users.id` (1:1 with the account). Carries `division_id` (required), `position_id` (optional), `birth_date`, `employment_date`/`dismissal_date` (dismissal = soft delete), `avatar_id`, `biography`. Many feature aggregates point at `employees.id`: course authorship, enrollments (and `assigned_by`), course applications, test attempts, onboarding (assigner + assignee), chat messages, and certificates.
 
 ### Files (`files`)
 
-- **`files`** — single store for uploaded blobs (just `url`). Other tables reference it via `*_id` columns (course covers, employee/client/company avatars, onboarding template & step covers). All FKs use `ON DELETE SET NULL` so deleting a file never cascades into business data.
+- **`files`** — single store for uploaded blobs (just `url`, the S3/MinIO object key). Other tables reference it via `*_id` columns (course covers, employee avatars, onboarding template & step covers). All FKs use `ON DELETE SET NULL` so deleting a file never cascades into business data. The actual object lives in MinIO; controllers hand out presigned URLs.
 
-### Education (`courses`, `modules`, `steps`, `lessons`, `tests`, `course_questions`, `course_answers`, `test_questions`, `test_attempts`, `test_attempt_answers`, `course_enrollments`, `step_progress`)
+### Education (`courses`, `modules`, `steps`, `lessons`, `tests`, `course_questions`, `course_answers`, `test_questions`, `test_attempts`, `test_attempt_answers`, `course_applications`, `course_enrollments`, `step_progress`, `course_certificates`)
 
-- **`courses`** — top-level learnable unit. `author_id` → `employees.id`; optional `cover_id` → `files.id` (SET NULL). Owns `modules` (cascade), `course_questions` (cascade), and `course_enrollments` (cascade). Also referenced by `onboarding_template_steps` / `onboarding_steps` when a step is course-based.
+- **`courses`** — top-level learnable unit. `author_id` → `employees.id`; optional `cover_id` → `files.id` (SET NULL). Carries a **publication workflow**: `status` (`course_status` enum: `DRAFT` → `PENDING_REVIEW` → `PUBLISHED` / `REJECTED`, default `PUBLISHED`) with `review_note` for rejections, plus `is_archived`. **Visibility** is governed by `scope` (`course_scope` enum: `ALL` / `DEPARTMENT` / `DIVISION`) with optional `department_id` / `division_id` (both SET NULL). Owns `modules`, `course_questions`, `course_enrollments`, `course_applications`, `course_certificates` (all cascade). Also referenced by `onboarding_template_steps` / `onboarding_steps` when a step is course-based.
 - **`modules`** — ordered sub-sections of a course. Unique `(course_id, position)` enforces a single ordering.
 - **`steps`** — ordered units inside a module. `type` (`step_type` enum: `LESSON` or `TEST`) plus an optional `lesson_id` / `test_id` (both SET NULL when the referenced lesson/test is removed). Unique `(module_id, position)`.
 - **`lessons`** — reusable lesson content referenced by `steps.lesson_id`.
@@ -152,8 +174,10 @@ Tables are grouped by bounded context. All PKs are `uuid`, all timestamps are `t
 - **`test_questions`** — which questions a particular test pulls in. Unique `(test_id, question_id)` prevents duplicates.
 - **`test_attempts`** — one row per "an employee opened this test". Closed when `ended_at` is set. Indexed on `(employee_id, test_id)` for "have they passed yet" queries.
 - **`test_attempt_answers`** — per-question response within an attempt. Holds the chosen `answer_id` plus the literal `option` text snapshot.
-- **`course_enrollments`** — an employee enrolled in a course. Unique `(course_id, employee_id)` ensures a single live enrollment row; carries `status` (`enrollment_status` enum: `IN_PROGRESS` / `COMPLETED` / `CANCELLED`), `started_at`, `completed_at`. Cascades from course or employee deletion.
+- **`course_applications`** — an employee's self-request to take a course. `status` (`application_status` enum: `PENDING` / `APPROVED` / `REJECTED`); unique `(course_id, employee_id)`. Approval typically spawns an enrollment.
+- **`course_enrollments`** — an employee enrolled in a course. Unique `(course_id, employee_id)` ensures a single live enrollment row; carries optional `assigned_by_id` (the manager who enrolled them, SET NULL), `current_step_id`, `status` (`enrollment_status` enum: `IN_PROGRESS` / `COMPLETED` / `CANCELLED`), `started_at`, `completed_at`. Cascades from course or employee deletion. A completed enrollment has a 1:1 `course_certificate`.
 - **`step_progress`** — per-step completion record under an enrollment. Unique `(step_id, enrollment_id)` so each step has at most one progress row per enrollment.
+- **`course_certificates`** — issued on course completion. `enrollment_id` is `UNIQUE` (1:1 with the enrollment); also denormalizes `employee_id` / `course_id` and `issued_at`. Fetchable publicly by id for verification.
 
 ### Onboarding (`onboarding_templates`, `onboarding_template_steps`, `onboarding_template_step_feedback_options`, `onboardings`, `onboarding_steps`, `onboarding_step_feedback_options`, `onboarding_step_feedback_selections`, `onboarding_chats`, `onboarding_chat_messages`)
 
