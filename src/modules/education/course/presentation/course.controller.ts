@@ -144,6 +144,7 @@ export class CourseController {
   }
 
   @Get('analytics')
+  @Roles('admin', 'department_head', 'division_head', 'senior_manager')
   @ApiOperation({
     summary: 'Courses enrollment overview (paginated, with completion rates)',
   })
@@ -165,6 +166,7 @@ export class CourseController {
   }
 
   @Get(':id/analytics')
+  @Roles('admin', 'department_head', 'division_head', 'senior_manager')
   @ApiOperation({
     summary:
       'Course analytics: enrollment stats broken down by division and department',

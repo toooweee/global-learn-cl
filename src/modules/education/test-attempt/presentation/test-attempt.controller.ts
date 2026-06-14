@@ -86,7 +86,7 @@ export class TestAttemptController {
   @Post('attempts/:id/finish')
   @ApiOperation({
     summary:
-      'Finish the attempt and get score (correct/total, passed if ≥ 80%)',
+      "Finish the attempt and get score (correct/total, passed if ≥ the test's passing percent)",
   })
   @ApiCreatedResponse({ type: TestAttemptResultDto })
   @ApiNotFoundResponse()

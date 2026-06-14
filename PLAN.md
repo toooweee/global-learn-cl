@@ -64,13 +64,13 @@
 
 ---
 
-## Мелкие баги/несоответствия (быстрые, чинить кодом)  `[ ]`
-- [ ] Role-case баг: `EmployeeController.update` сравнивает `user.role !== 'Admin'` → должно `'admin'`. (`src/modules/employee/presentation/employee.controller.ts`)
-- [ ] Недостающие `@Roles` на мутациях: `POST /user`, `DELETE /files/:id`, `DELETE /enrollments/:id`, `POST /onboardings`, `POST /onboardings/:id/cancel`, `GET /courses/analytics`. Решить политику и проставить.
-- [ ] `GET /` health: добавить `@Public()` или отдельный публичный `/health`.
-- [ ] `UserController`: добавить `@ApiTags('users')`.
-- [ ] `finish` test-attempt: поправить `@ApiOperation` summary («≥80%» → «≥ passingPercent»).
-- [ ] (опц.) свести 3 пути создания аккаунта (`/auth/register`, `/employees`, `/user`).
+## Мелкие баги/несоответствия (быстрые, чинить кодом)  `[x]`  — ветка `fix/authz-and-minor-bugs`
+- [x] Role-case баг: `EmployeeController.update` → `user.role !== ROLE.ADMIN` (было `'Admin'`, админ не исключался из self-only проверки).
+- [x] Недостающие `@Roles`: `POST /user` → admin; `DELETE /files/:id` → COURSE_CREATOR_ROLES; `POST /onboardings` → COURSE_ASSIGNER_ROLES; `GET /courses/analytics` (+`/:id/analytics`) → admin+dept+div+senior. Self-service (`DELETE /enrollments/:id`, `POST /onboardings/:id/cancel`) — не `@Roles`, а ownership-проверка в хэндлерах через `RequestContextService` (владелец/участник или менеджер; иначе 403), чтобы не сломать самообслуживание клиента.
+- [x] `GET /` health → `@Public()`.
+- [x] `UserController` → `@ApiTags('users')`.
+- [x] `finish` test-attempt: summary «≥ 80%» → «≥ the test's passing percent».
+- [ ] (опц., не делал) свести 3 пути создания аккаунта (`/auth/register`, `/employees`, `/user`).
 
 ## Порядок работы
 1. Проставить `Реш: CODE|DOC` по P1–P5 (спросить пользователя, если не очевидно).
@@ -91,4 +91,9 @@
   (рендер) + `CertificateIssuerService` (генерация→MinIO→files→set file_id, best-effort) вызывается
   из `complete-step`; read-хэндлеры отдают presigned `fileUrl`. nest-cli копирует .ttf в `dist/src`.
   build + test (50/50) + смоук PDF зелёные. Дальше: P4 (аудит), P5 (видео), мелкие баги/@Roles.
+- 2026-06-15 — мелкие баги/@Roles на ветке `fix/authz-and-minor-bugs` (от main, независимо от P1/P3):
+  role-case фикс; недостающие `@Roles` (POST /user, DELETE /files, POST /onboardings, course analytics);
+  ownership-проверки на cancel enrollment/onboarding (через RequestContextService — IDOR + сохраняет
+  самообслуживание); `GET /` → @Public; UserController @ApiTags; summary теста. build+test (50/50)
+  зелёные. Осталось: P4 (аудит), P5 (видео).
 </content>

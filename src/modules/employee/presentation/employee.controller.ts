@@ -17,6 +17,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '@/libs/auth/decorators/roles.decorator';
+import { ROLE } from '@/libs/auth/roles.constants';
 import { ApplicationException } from '@/libs/application/exceptions/application.exception';
 import { CurrentUser } from '@/libs/auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '@/libs/auth/decorators/current-user.decorator';
@@ -165,7 +166,7 @@ export class EmployeeController {
     @Body() body: UpdateEmployeeRequestDto,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<void> {
-    if (user.role !== 'Admin' && user.userId !== params.id) {
+    if (user.role !== ROLE.ADMIN && user.userId !== params.id) {
       throw new ApplicationException(
         'You can only update your own profile',
         403,

@@ -37,6 +37,8 @@ import { PaginatedResponseDto } from '@/libs/api/dto/paginated.response.dto';
 import { Paginated } from '@/libs/application/query.base';
 import { CurrentUser } from '@/libs/auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '@/libs/auth/decorators/current-user.decorator';
+import { Roles } from '@/libs/auth/decorators/roles.decorator';
+import { COURSE_ASSIGNER_ROLES } from '@/libs/auth/roles.constants';
 
 class OnboardingsFilterQueryDto extends PaginatedQueryRequestDto {
   @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440000' })
@@ -64,6 +66,7 @@ export class OnboardingController {
   ) {}
 
   @Post()
+  @Roles(...COURSE_ASSIGNER_ROLES)
   @ApiOperation({ summary: 'Assign an onboarding from a template' })
   @ApiCreatedResponse({ type: IdResponseDto })
   @ApiNotFoundResponse()

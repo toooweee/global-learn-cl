@@ -34,6 +34,8 @@ import {
   type FileRepositoryPort,
 } from '@/modules/files/application/ports/file.repository.port';
 import { FileMapper } from '@/modules/files/file.mapper';
+import { Roles } from '@/libs/auth/decorators/roles.decorator';
+import { COURSE_CREATOR_ROLES } from '@/libs/auth/roles.constants';
 
 const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -106,6 +108,7 @@ export class FileController {
   @ApiOperation({ summary: 'Delete a file' })
   @ApiNoContentResponse()
   @ApiNotFoundResponse()
+  @Roles(...COURSE_CREATOR_ROLES)
   @Delete(':id')
   async delete(@Param() { id }: IdRequestDto): Promise<void> {
     await this.commandBus.execute<DeleteFileCommand, void>(

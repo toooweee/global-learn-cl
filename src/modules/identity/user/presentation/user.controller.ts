@@ -10,6 +10,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiTags,
 } from '@nestjs/swagger';
 import { FindUserQuery } from '@/modules/identity/user/application/queries/find-user/find-user.query';
 import { User } from '@generated/client';
@@ -19,7 +20,10 @@ import { PaginatedQueryRequestDto } from '@/libs/api/dto/paginated.query.request
 import { FindUsersQuery } from '@/modules/identity/user/application/queries/find-users/find-users.query';
 import { Paginated } from '@/libs/application';
 import { ApiPaginatedResponse } from '@/libs/api/decorators/api-paginated-response.decorator';
+import { Roles } from '@/libs/auth/decorators/roles.decorator';
+import { ROLE } from '@/libs/auth/roles.constants';
 
+@ApiTags('users')
 @Controller('user')
 export class UserController {
   constructor(
@@ -32,6 +36,7 @@ export class UserController {
   })
   @ApiCreatedResponse({ type: IdResponseDto })
   @ApiConflictResponse({})
+  @Roles(ROLE.ADMIN)
   @Post()
   async create(@Body() body: CreateUserRequestDto) {
     const userId = await this.commandBus.execute<
