@@ -2,19 +2,26 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { OnboardingStatus } from '@generated/client';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { Paginated } from '@/libs/application/query.base';
-import { OnboardingSummaryResponseDto } from '@/modules/onboarding/assignment/presentation/dto/onboarding.response.dto';
+import {
+  OnboardingMapper,
+  onboardingInclude,
+} from '@/modules/onboarding/assignment/onboarding.mapper';
+import { OnboardingResponseDto } from '@/modules/onboarding/assignment/presentation/dto/onboarding.response.dto';
 import { ListOnboardingsQuery } from './list-onboardings.query';
 
 @QueryHandler(ListOnboardingsQuery)
 export class ListOnboardingsQueryHandler implements IQueryHandler<
   ListOnboardingsQuery,
-  Paginated<OnboardingSummaryResponseDto>
+  Paginated<OnboardingResponseDto>
 > {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly mapper: OnboardingMapper,
+  ) {}
 
   async execute(
     query: ListOnboardingsQuery,
-  ): Promise<Paginated<OnboardingSummaryResponseDto>> {
+  ): Promise<Paginated<OnboardingResponseDto>> {
     const where: {
       assignedToId?: string;
       assignedById?: string;
@@ -31,6 +38,7 @@ export class ListOnboardingsQueryHandler implements IQueryHandler<
         take: query.limit,
         skip: query.offset,
         orderBy: { createdAt: 'desc' },
+        include: onboardingInclude,
       }),
     ]);
 
@@ -38,7 +46,7 @@ export class ListOnboardingsQueryHandler implements IQueryHandler<
       count,
       limit: query.limit,
       page: query.page,
-      data: rows.map((r) => new OnboardingSummaryResponseDto(r)),
+      data: rows.map((r) => this.mapper.toResponse(r)),
     });
   }
 }

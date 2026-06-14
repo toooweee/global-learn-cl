@@ -30,10 +30,7 @@ import { ListAssignedByMeQuery } from '@/modules/onboarding/assignment/applicati
 import { ListOnboardingsQuery } from '@/modules/onboarding/assignment/application/queries/list-onboardings/list-onboardings.query';
 import { AssignOnboardingRequestDto } from '@/modules/onboarding/assignment/presentation/dto/assign-onboarding.request.dto';
 import { CompleteOnboardingStepRequestDto } from '@/modules/onboarding/assignment/presentation/dto/complete-step.request.dto';
-import {
-  OnboardingResponseDto,
-  OnboardingSummaryResponseDto,
-} from '@/modules/onboarding/assignment/presentation/dto/onboarding.response.dto';
+import { OnboardingResponseDto } from '@/modules/onboarding/assignment/presentation/dto/onboarding.response.dto';
 import { IdResponseDto } from '@/libs/api/dto';
 import { PaginatedQueryRequestDto } from '@/libs/api/dto/paginated.query.request.dto';
 import { PaginatedResponseDto } from '@/libs/api/dto/paginated.response.dto';
@@ -87,7 +84,7 @@ export class OnboardingController {
   @ApiOkResponse({ type: PaginatedResponseDto })
   list(
     @Query() query: OnboardingsFilterQueryDto,
-  ): Promise<Paginated<OnboardingSummaryResponseDto>> {
+  ): Promise<Paginated<OnboardingResponseDto>> {
     return this.queryBus.execute(
       new ListOnboardingsQuery({
         limit: query.limit,
@@ -101,15 +98,15 @@ export class OnboardingController {
 
   @Get('mine')
   @ApiOperation({ summary: 'List my onboardings (as assignee)' })
-  @ApiOkResponse({ type: [OnboardingSummaryResponseDto] })
-  listMine(): Promise<OnboardingSummaryResponseDto[]> {
+  @ApiOkResponse({ type: [OnboardingResponseDto] })
+  listMine(): Promise<OnboardingResponseDto[]> {
     return this.queryBus.execute(new ListMyOnboardingsQuery());
   }
 
   @Get('assigned-by-me')
   @ApiOperation({ summary: 'List onboardings I assigned (as manager)' })
-  @ApiOkResponse({ type: [OnboardingSummaryResponseDto] })
-  listAssignedByMe(): Promise<OnboardingSummaryResponseDto[]> {
+  @ApiOkResponse({ type: [OnboardingResponseDto] })
+  listAssignedByMe(): Promise<OnboardingResponseDto[]> {
     return this.queryBus.execute(new ListAssignedByMeQuery());
   }
 
