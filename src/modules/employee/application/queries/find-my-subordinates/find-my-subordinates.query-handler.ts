@@ -2,6 +2,7 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { FindMySubordinatesQuery } from '@/modules/employee/application/queries/find-my-subordinates/find-my-subordinates.query';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { EmployeeResponseDto } from '@/modules/employee/presentation/dto/employee.response.dto';
+import { subordinateOrgScope } from '@/modules/employee/application/subordinate-org-scope';
 
 @QueryHandler(FindMySubordinatesQuery)
 export class FindMySubordinatesQueryHandler implements IQueryHandler<
@@ -15,15 +16,27 @@ export class FindMySubordinatesQueryHandler implements IQueryHandler<
   ): Promise<EmployeeResponseDto[]> {
     const me = await this.prismaService.client.employee.findUnique({
       where: { id: query.currentEmployeeId },
-      select: { positionId: true },
+      select: {
+        positionId: true,
+        divisionId: true,
+        division: { select: { departmentId: true } },
+        user: { select: { role: { select: { name: true } } } },
+      },
     });
 
     if (!me?.positionId) return [];
+
+    const orgScope = subordinateOrgScope(
+      me.user.role.name,
+      me.divisionId,
+      me.division.departmentId,
+    );
 
     const rows = await this.prismaService.client.employee.findMany({
       where: {
         position: { parentId: me.positionId },
         dismissalDate: null,
+        ...orgScope,
       },
       include: {
         user: { include: { role: true } },

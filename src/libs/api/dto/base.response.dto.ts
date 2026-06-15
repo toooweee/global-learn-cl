@@ -3,8 +3,10 @@ import { IdResponseDto } from '@/libs/api/dto/id.response.dto';
 
 export interface BaseResponseDtoProps {
   id: string;
-  createdAt: Date;
-  updatedAt?: Date;
+  // Accept string too: values read back from the Redis cache are JSON, so a
+  // Date round-trips as an ISO string rather than a Date instance.
+  createdAt: Date | string;
+  updatedAt?: Date | string | null;
 }
 
 export class BaseResponseDto extends IdResponseDto {
@@ -16,7 +18,9 @@ export class BaseResponseDto extends IdResponseDto {
 
   constructor(props: BaseResponseDtoProps) {
     super(props.id);
-    this.createdAt = props.createdAt.toISOString();
-    this.updatedAt = props.updatedAt?.toISOString();
+    this.createdAt = new Date(props.createdAt).toISOString();
+    this.updatedAt = props.updatedAt
+      ? new Date(props.updatedAt).toISOString()
+      : undefined;
   }
 }

@@ -7,6 +7,7 @@ export class SubordinateTreeEmployeeDto {
   @ApiPropertyOptional({ nullable: true }) avatarId: string | null;
   @ApiProperty() divisionId: string;
   @ApiProperty() divisionName: string;
+  @ApiProperty() departmentId: string;
 
   constructor(props: {
     id: string;
@@ -15,6 +16,7 @@ export class SubordinateTreeEmployeeDto {
     avatarId: string | null;
     divisionId: string;
     divisionName: string;
+    departmentId: string;
   }) {
     this.id = props.id;
     this.fullname = props.fullname;
@@ -22,6 +24,7 @@ export class SubordinateTreeEmployeeDto {
     this.avatarId = props.avatarId;
     this.divisionId = props.divisionId;
     this.divisionName = props.divisionName;
+    this.departmentId = props.departmentId;
   }
 }
 

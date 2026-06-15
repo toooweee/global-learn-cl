@@ -1,6 +1,52 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BaseResponseDto } from '@/libs/api/dto/base.response.dto';
 
+// ── Taker-facing test shape: questions WITHOUT the isCorrect flag, so the
+// correct answers are never shipped to the person taking the test. ──────────
+export class AttemptOptionDto {
+  @ApiProperty() id: string;
+  @ApiProperty() text: string;
+
+  constructor(props: { id: string; text: string }) {
+    this.id = props.id;
+    this.text = props.text;
+  }
+}
+
+export class AttemptQuestionDto {
+  @ApiProperty() id: string;
+  @ApiProperty() question: string;
+  @ApiProperty({ type: () => [AttemptOptionDto] })
+  options: AttemptOptionDto[];
+
+  constructor(props: {
+    id: string;
+    question: string;
+    options: AttemptOptionDto[];
+  }) {
+    this.id = props.id;
+    this.question = props.question;
+    this.options = props.options;
+  }
+}
+
+export class TestForAttemptDto {
+  @ApiProperty() testId: string;
+  @ApiProperty({ example: 80 }) passingPercent: number;
+  @ApiProperty({ type: () => [AttemptQuestionDto] })
+  questions: AttemptQuestionDto[];
+
+  constructor(props: {
+    testId: string;
+    passingPercent: number;
+    questions: AttemptQuestionDto[];
+  }) {
+    this.testId = props.testId;
+    this.passingPercent = props.passingPercent;
+    this.questions = props.questions;
+  }
+}
+
 export class TestAttemptResultDto {
   @ApiProperty({ example: 8, description: 'Number of correct answers' })
   correct: number;

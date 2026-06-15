@@ -43,6 +43,109 @@ const companyStructure = [
   },
 ];
 
+// Compact, idempotent course creator: one "Материалы курса" module with all
+// lessons as steps, plus a "Проверка знаний" module with a single test that
+// pulls in every question. Skips creation if a course with the same name
+// already exists.
+async function seedCourse(opts: {
+  name: string;
+  description: string;
+  scope: 'ALL' | 'DEPARTMENT' | 'DIVISION';
+  authorId: string;
+  departmentId?: string;
+  divisionId?: string;
+  passingPercent?: number;
+  lessons: { name: string; content: string }[];
+  questions: {
+    question: string;
+    answers: { answer: string; isCorrect: boolean }[];
+  }[];
+}): Promise<void> {
+  const existing = await prisma.course.findFirst({
+    where: { name: opts.name },
+  });
+  if (existing) {
+    console.log(`○ Course already exists: ${opts.name}`);
+    return;
+  }
+
+  const lessons = await Promise.all(
+    opts.lessons.map((l) =>
+      prisma.lesson.create({
+        data: { name: l.name, content: l.content },
+      }),
+    ),
+  );
+
+  const test = await prisma.test.create({
+    data: {
+      name: `Тест: ${opts.name}`,
+      passingPercent: opts.passingPercent ?? 70,
+    },
+  });
+
+  const course = await prisma.course.create({
+    data: {
+      name: opts.name,
+      description: opts.description,
+      scope: opts.scope,
+      departmentId: opts.departmentId ?? null,
+      divisionId: opts.divisionId ?? null,
+      authorId: opts.authorId,
+      modules: {
+        create: [
+          {
+            name: 'Материалы курса',
+            position: 1,
+            steps: {
+              create: lessons.map((lesson, i) => ({
+                name: opts.lessons[i].name,
+                position: i + 1,
+                type: 'LESSON' as const,
+                lessonId: lesson.id,
+              })),
+            },
+          },
+          {
+            name: 'Проверка знаний',
+            position: 2,
+            steps: {
+              create: [
+                {
+                  name: 'Итоговый тест',
+                  position: 1,
+                  type: 'TEST' as const,
+                  testId: test.id,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+
+  const createdQuestions = await Promise.all(
+    opts.questions.map((q) =>
+      prisma.courseQuestion.create({
+        data: {
+          courseId: course.id,
+          question: q.question,
+          answers: { create: q.answers },
+        },
+      }),
+    ),
+  );
+
+  await prisma.testQuestion.createMany({
+    data: createdQuestions.map((q) => ({ testId: test.id, questionId: q.id })),
+  });
+
+  console.log(
+    `✓ Course: ${opts.name} (${opts.lessons.length} уроков, ${opts.questions.length} вопросов)`,
+  );
+}
+
 async function main() {
   // ── Roles ─────────────────────────────────────────────────────────────────
   const adminRole = await prisma.role.upsert({
@@ -244,6 +347,92 @@ async function main() {
       division: 'Отдел сервиса и обслуживания',
       positionId: posManager.id,
       employmentDate: new Date('2023-09-18'),
+    },
+
+    // ── ИТ-отдел (подчинённые Иванова, division_head) ──────────────────────
+    {
+      email: 'grigoriev@global-learn.ru',
+      fullname: 'Григорьев Павел Андреевич',
+      biography: 'Старший инженер, ведёт инфраструктуру и DevOps',
+      division: 'ИТ-отдел',
+      positionId: posSeniorManager.id,
+      employmentDate: new Date('2022-05-20'),
+    },
+    {
+      email: 'fedorov@global-learn.ru',
+      fullname: 'Фёдоров Илья Романович',
+      biography: 'Системный администратор, поддержка рабочих станций и сети',
+      division: 'ИТ-отдел',
+      positionId: posManager.id,
+      employmentDate: new Date('2023-02-13'),
+    },
+    {
+      email: 'mikhailova@global-learn.ru',
+      fullname: 'Михайлова Дарья Олеговна',
+      biography: 'Специалист технической поддержки 2-й линии',
+      division: 'ИТ-отдел',
+      positionId: posManager.id,
+      employmentDate: new Date('2023-08-07'),
+    },
+    {
+      email: 'orlov@global-learn.ru',
+      fullname: 'Орлов Никита Сергеевич',
+      biography: 'Инженер по информационной безопасности',
+      division: 'ИТ-отдел',
+      positionId: posManager.id,
+      employmentDate: new Date('2024-02-26'),
+    },
+
+    // ── Отдел разработки (подчинённые Петровой, senior_manager) ────────────
+    {
+      email: 'vasilieva@global-learn.ru',
+      fullname: 'Васильева Екатерина Игоревна',
+      biography: 'Frontend-разработчик, отвечает за клиентскую часть LMS',
+      division: 'Отдел разработки',
+      positionId: posManager.id,
+      employmentDate: new Date('2023-03-06'),
+    },
+    {
+      email: 'pavlov@global-learn.ru',
+      fullname: 'Павлов Антон Викторович',
+      biography: 'Backend-разработчик, проектирует API и интеграции',
+      division: 'Отдел разработки',
+      positionId: posManager.id,
+      employmentDate: new Date('2023-05-22'),
+    },
+    {
+      email: 'nikitin@global-learn.ru',
+      fullname: 'Никитин Григорий Павлович',
+      biography: 'Fullstack-разработчик, занимается отчётностью и аналитикой',
+      division: 'Отдел разработки',
+      positionId: posManager.id,
+      employmentDate: new Date('2023-11-13'),
+    },
+    {
+      email: 'romanova@global-learn.ru',
+      fullname: 'Романова Алиса Дмитриевна',
+      biography: 'QA-инженер, автоматизация тестирования',
+      division: 'Отдел разработки',
+      positionId: posManager.id,
+      employmentDate: new Date('2024-04-15'),
+    },
+
+    // ── Отдел маркетинга (доп. сотрудники департамента) ────────────────────
+    {
+      email: 'belova@global-learn.ru',
+      fullname: 'Белова Виктория Олеговна',
+      biography: 'SMM-специалист, ведёт социальные сети и контент-план',
+      division: 'Отдел маркетинга',
+      positionId: posManager.id,
+      employmentDate: new Date('2023-07-24'),
+    },
+    {
+      email: 'egorov@global-learn.ru',
+      fullname: 'Егоров Максим Алексеевич',
+      biography: 'Performance-маркетолог, отвечает за платный трафик',
+      division: 'Отдел маркетинга',
+      positionId: posManager.id,
+      employmentDate: new Date('2024-01-22'),
     },
   ];
 
@@ -793,6 +982,506 @@ async function main() {
     course2Id = existingCourse2.id;
     console.log('○ Course 2 already exists');
   }
+
+  // ── Курсы Отдела разработки: Excel (scope = DIVISION) ─────────────────────
+  const devDivisionId = divisionIds['Отдел разработки'];
+
+  await seedCourse({
+    name: 'Excel для разработчиков: формулы и функции',
+    description:
+      'Практический курс по Excel для команды разработки: формулы, ссылки, поиск и логические функции для работы с выгрузками и отчётами.',
+    scope: 'DIVISION',
+    divisionId: devDivisionId,
+    authorId: adminEmployeeId,
+    passingPercent: 70,
+    lessons: [
+      {
+        name: 'Формулы и ссылки',
+        content: [
+          '# Формулы и ссылки',
+          '',
+          'Любая формула начинается со знака `=`.',
+          '',
+          '## Относительные и абсолютные ссылки',
+          '- `A1` — относительная: меняется при копировании',
+          '- `$A$1` — абсолютная: зафиксированы и столбец, и строка',
+          '- `$A1` / `A$1` — смешанные',
+          '',
+          '## Базовые функции',
+          '- `SUM`, `AVERAGE`, `MIN`, `MAX`',
+          '- `COUNT` / `COUNTA` — счёт чисел / непустых ячеек',
+        ].join('\n'),
+      },
+      {
+        name: 'Поиск данных: VLOOKUP и INDEX/MATCH',
+        content: [
+          '# Поиск данных',
+          '',
+          '## VLOOKUP',
+          '`=VLOOKUP(искомое; диапазон; номер_столбца; 0)` — точный поиск по первому столбцу.',
+          '',
+          '## INDEX + MATCH',
+          'Более гибкая связка: ищет в любом направлении.',
+          '`=INDEX(столбец_результата; MATCH(искомое; столбец_поиска; 0))`',
+          '',
+          '> INDEX/MATCH не ломается при вставке столбцов, в отличие от VLOOKUP.',
+        ].join('\n'),
+      },
+      {
+        name: 'Логические функции',
+        content: [
+          '# Логика в Excel',
+          '',
+          '## IF',
+          '`=IF(условие; значение_если_истина; значение_если_ложь)`',
+          '',
+          '## Вложенные условия и IFS',
+          '`=IFS(усл1; знач1; усл2; знач2; ...)` — читаемее вложенных IF.',
+          '',
+          '## Агрегаты по условию',
+          '- `SUMIF` / `SUMIFS`',
+          '- `COUNTIF` / `COUNTIFS`',
+        ].join('\n'),
+      },
+    ],
+    questions: [
+      {
+        question: 'Что означает ссылка `$A$1`?',
+        answers: [
+          { answer: 'Относительная ссылка', isCorrect: false },
+          {
+            answer: 'Абсолютная: зафиксированы столбец и строка',
+            isCorrect: true,
+          },
+          { answer: 'Ссылка на другой лист', isCorrect: false },
+          { answer: 'Ошибка в формуле', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Какой аргумент VLOOKUP включает точный поиск?',
+        answers: [
+          { answer: '1 (TRUE)', isCorrect: false },
+          { answer: '0 (FALSE)', isCorrect: true },
+          { answer: 'Любой текст', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Чем INDEX/MATCH лучше VLOOKUP?',
+        answers: [
+          { answer: 'Работает только сверху вниз', isCorrect: false },
+          {
+            answer: 'Ищет в любом направлении и устойчив к вставке столбцов',
+            isCorrect: true,
+          },
+          { answer: 'Не требует диапазона', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Какая функция суммирует значения по условию?',
+        answers: [
+          { answer: 'SUMIF', isCorrect: true },
+          { answer: 'CONCAT', isCorrect: false },
+          { answer: 'TRIM', isCorrect: false },
+          { answer: 'LEN', isCorrect: false },
+        ],
+      },
+    ],
+  });
+
+  await seedCourse({
+    name: 'Excel: сводные таблицы и анализ данных',
+    description:
+      'Сводные таблицы, срезы и визуализация для быстрого анализа больших выгрузок. Для аналитики внутри отдела разработки.',
+    scope: 'DIVISION',
+    divisionId: devDivisionId,
+    authorId: adminEmployeeId,
+    passingPercent: 70,
+    lessons: [
+      {
+        name: 'Сводные таблицы (PivotTable)',
+        content: [
+          '# Сводные таблицы',
+          '',
+          'Сводная таблица агрегирует данные без формул: перетаскиванием полей в области **Строки**, **Столбцы**, **Значения**, **Фильтры**.',
+          '',
+          '## Когда использовать',
+          '- Нужны итоги по группам (сумма, среднее, количество)',
+          '- Данные регулярно обновляются — достаточно нажать «Обновить»',
+        ].join('\n'),
+      },
+      {
+        name: 'Срезы и диаграммы',
+        content: [
+          '# Срезы и визуализация',
+          '',
+          '## Срезы (Slicers)',
+          'Кнопочные фильтры поверх сводной — удобно для интерактивных дашбордов.',
+          '',
+          '## Диаграммы',
+          '- Гистограмма — сравнение категорий',
+          '- Линейная — динамика во времени',
+          '- Круговая — доли (не больше 5-6 секторов)',
+        ].join('\n'),
+      },
+    ],
+    questions: [
+      {
+        question: 'Что делает сводная таблица?',
+        answers: [
+          {
+            answer: 'Агрегирует данные по группам без ручных формул',
+            isCorrect: true,
+          },
+          { answer: 'Удаляет дубликаты строк', isCorrect: false },
+          { answer: 'Шифрует файл', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Для чего нужны срезы (Slicers)?',
+        answers: [
+          { answer: 'Для интерактивной фильтрации сводной', isCorrect: true },
+          { answer: 'Для печати листа', isCorrect: false },
+          { answer: 'Для защиты ячеек', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Какой тип диаграммы лучше для динамики во времени?',
+        answers: [
+          { answer: 'Круговая', isCorrect: false },
+          { answer: 'Линейная', isCorrect: true },
+          { answer: 'Кольцевая', isCorrect: false },
+        ],
+      },
+    ],
+  });
+
+  // ── Курсы ИТ-отдела (scope = DIVISION) ────────────────────────────────────
+  const itCourseDivisionId = divisionIds['ИТ-отдел'];
+
+  await seedCourse({
+    name: 'Основы информационной безопасности',
+    description:
+      'Базовая киберграмотность для ИТ-отдела: пароли, фишинг, защита данных и реакция на инциденты.',
+    scope: 'DIVISION',
+    divisionId: itCourseDivisionId,
+    authorId: adminEmployeeId,
+    passingPercent: 80,
+    lessons: [
+      {
+        name: 'Пароли и двухфакторная аутентификация',
+        content: [
+          '# Пароли и 2FA',
+          '',
+          '- Длина важнее сложности: парольная фраза из 4+ слов надёжнее `P@ss1`',
+          '- Уникальный пароль на каждый сервис → менеджер паролей',
+          '- 2FA обязательна для почты, VPN и админских панелей',
+        ].join('\n'),
+      },
+      {
+        name: 'Фишинг и социальная инженерия',
+        content: [
+          '# Фишинг',
+          '',
+          'Большинство взломов начинается с письма, а не с эксплойта.',
+          '',
+          '## Признаки фишинга',
+          '- Срочность и угрозы («аккаунт будет заблокирован»)',
+          '- Несовпадение адреса отправителя и домена',
+          '- Ссылки на поддельные формы входа',
+          '',
+          '> Не уверен — не кликай. Перешли письмо в ИБ.',
+        ].join('\n'),
+      },
+      {
+        name: 'Защита данных и инциденты',
+        content: [
+          '# Данные и инциденты',
+          '',
+          '## Классификация',
+          '- Публичные / внутренние / конфиденциальные / персональные',
+          '',
+          '## Если случился инцидент',
+          '1. Зафиксируй время и что произошло',
+          '2. Отключи устройство от сети (не выключай)',
+          '3. Сообщи в ИБ немедленно',
+        ].join('\n'),
+      },
+    ],
+    questions: [
+      {
+        question: 'Что надёжнее как пароль?',
+        answers: [
+          {
+            answer: 'Короткий пароль со спецсимволами вроде P@ss1',
+            isCorrect: false,
+          },
+          {
+            answer: 'Длинная парольная фраза из нескольких слов',
+            isCorrect: true,
+          },
+          { answer: 'Дата рождения', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Какой признак указывает на фишинговое письмо?',
+        answers: [
+          {
+            answer: 'Срочность и несовпадение домена отправителя',
+            isCorrect: true,
+          },
+          {
+            answer: 'Письмо от известного коллеги без вложений',
+            isCorrect: false,
+          },
+          { answer: 'Подпись с номером телефона', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Первое действие при подозрении на компрометацию устройства?',
+        answers: [
+          { answer: 'Выключить устройство полностью', isCorrect: false },
+          { answer: 'Отключить от сети и сообщить в ИБ', isCorrect: true },
+          { answer: 'Переустановить ОС', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Для каких систем 2FA обязательна?',
+        answers: [
+          { answer: 'Только для развлекательных сервисов', isCorrect: false },
+          { answer: 'Для почты, VPN и админских панелей', isCorrect: true },
+          { answer: '2FA не нужна, если пароль сложный', isCorrect: false },
+        ],
+      },
+    ],
+  });
+
+  await seedCourse({
+    name: 'Администрирование Linux: базовый уровень',
+    description:
+      'Командная строка, файловая система, права доступа и службы — необходимый минимум для ИТ-специалиста.',
+    scope: 'DIVISION',
+    divisionId: itCourseDivisionId,
+    authorId: adminEmployeeId,
+    passingPercent: 75,
+    lessons: [
+      {
+        name: 'Командная строка и файловая система',
+        content: [
+          '# Терминал',
+          '',
+          '- `pwd` — текущий каталог, `ls -la` — содержимое',
+          '- `cd`, `cp`, `mv`, `rm` — навигация и операции',
+          '- `cat`, `less`, `grep` — чтение и поиск',
+          '',
+          'Всё есть файл: устройства, процессы и настройки.',
+        ].join('\n'),
+      },
+      {
+        name: 'Права доступа и пользователи',
+        content: [
+          '# Права доступа',
+          '',
+          '`rwx` для владельца / группы / остальных.',
+          '- `chmod 644 file` — rw-r--r--',
+          '- `chown user:group file` — сменить владельца',
+          '- `sudo` — выполнение с правами root',
+        ].join('\n'),
+      },
+      {
+        name: 'Процессы и службы',
+        content: [
+          '# Процессы и службы',
+          '',
+          '- `ps aux`, `top`/`htop` — список процессов',
+          '- `kill`, `kill -9` — завершение',
+          '- `systemctl status|start|stop|restart <service>` — управление службами',
+          '- `journalctl -u <service>` — логи службы',
+        ].join('\n'),
+      },
+    ],
+    questions: [
+      {
+        question: 'Какая команда показывает текущий каталог?',
+        answers: [
+          { answer: 'pwd', isCorrect: true },
+          { answer: 'cd', isCorrect: false },
+          { answer: 'ls', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Что означает `chmod 644 file`?',
+        answers: [
+          { answer: 'rwx для всех', isCorrect: false },
+          {
+            answer: 'rw для владельца, r для группы и остальных',
+            isCorrect: true,
+          },
+          { answer: 'Полный запрет доступа', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Чем управляют службами в systemd?',
+        answers: [
+          { answer: 'systemctl', isCorrect: true },
+          { answer: 'grep', isCorrect: false },
+          { answer: 'chown', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Как посмотреть логи конкретной службы?',
+        answers: [
+          { answer: 'journalctl -u <service>', isCorrect: true },
+          { answer: 'cat /etc/passwd', isCorrect: false },
+          { answer: 'ps aux', isCorrect: false },
+        ],
+      },
+    ],
+  });
+
+  await seedCourse({
+    name: 'Компьютерные сети: базис для IT',
+    description:
+      'Модель TCP/IP, адресация и ключевые протоколы — фундамент для диагностики и поддержки.',
+    scope: 'DIVISION',
+    divisionId: itCourseDivisionId,
+    authorId: adminEmployeeId,
+    passingPercent: 70,
+    lessons: [
+      {
+        name: 'Модель OSI и TCP/IP',
+        content: [
+          '# Сетевые модели',
+          '',
+          'TCP/IP-стек: канальный → сетевой → транспортный → прикладной.',
+          '- TCP — надёжная доставка с подтверждением',
+          '- UDP — быстро, без гарантий (видео, DNS-запросы)',
+        ].join('\n'),
+      },
+      {
+        name: 'IP-адресация и подсети',
+        content: [
+          '# IP и подсети',
+          '',
+          '- IPv4: 4 октета, напр. `192.168.1.10`',
+          '- Маска `/24` = 256 адресов (254 хоста)',
+          '- Приватные диапазоны: `10.0.0.0/8`, `192.168.0.0/16`',
+        ].join('\n'),
+      },
+      {
+        name: 'DNS, HTTP и диагностика',
+        content: [
+          '# Протоколы и диагностика',
+          '',
+          '- DNS превращает имя в IP',
+          '- HTTP/HTTPS — веб (порты 80/443)',
+          '- Инструменты: `ping`, `traceroute`, `nslookup`, `curl`',
+        ].join('\n'),
+      },
+    ],
+    questions: [
+      {
+        question: 'Чем TCP отличается от UDP?',
+        answers: [
+          {
+            answer:
+              'TCP — надёжная доставка с подтверждением, UDP — быстрая без гарантий',
+            isCorrect: true,
+          },
+          { answer: 'UDP надёжнее TCP', isCorrect: false },
+          { answer: 'Это одно и то же', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Сколько хостов в подсети с маской /24?',
+        answers: [
+          { answer: '254', isCorrect: true },
+          { answer: '1024', isCorrect: false },
+          { answer: '64', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Что делает DNS?',
+        answers: [
+          { answer: 'Превращает доменное имя в IP-адрес', isCorrect: true },
+          { answer: 'Шифрует трафик', isCorrect: false },
+          { answer: 'Раздаёт IP-адреса', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Какой порт по умолчанию у HTTPS?',
+        answers: [
+          { answer: '443', isCorrect: true },
+          { answer: '80', isCorrect: false },
+          { answer: '22', isCorrect: false },
+        ],
+      },
+    ],
+  });
+
+  // ── Общий курс (scope = ALL) ──────────────────────────────────────────────
+  await seedCourse({
+    name: 'Тайм-менеджмент и личная эффективность',
+    description:
+      'Приоритизация, планирование и борьба с прокрастинацией. Доступен всем сотрудникам.',
+    scope: 'ALL',
+    authorId: adminEmployeeId,
+    passingPercent: 70,
+    lessons: [
+      {
+        name: 'Приоритизация: матрица Эйзенхауэра',
+        content: [
+          '# Матрица Эйзенхауэра',
+          '',
+          '| | Срочно | Не срочно |',
+          '|---|---|---|',
+          '| **Важно** | Сделать сейчас | Запланировать |',
+          '| **Не важно** | Делегировать | Удалить |',
+          '',
+          'Большая часть результата приходит из квадранта «Важно / Не срочно».',
+        ].join('\n'),
+      },
+      {
+        name: 'Планирование и фокус',
+        content: [
+          '# Планирование',
+          '',
+          '- Правило 1-3-5: 1 крупная, 3 средних, 5 мелких задач на день',
+          '- Тайм-блокинг: резервируйте время в календаре под задачи',
+          '- Pomodoro: 25 минут работы / 5 минут отдыха',
+        ].join('\n'),
+      },
+    ],
+    questions: [
+      {
+        question:
+          'Какой квадрант матрицы Эйзенхауэра даёт наибольший долгосрочный результат?',
+        answers: [
+          { answer: 'Важно / Не срочно', isCorrect: true },
+          { answer: 'Не важно / Срочно', isCorrect: false },
+          { answer: 'Не важно / Не срочно', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Что предлагает техника Pomodoro?',
+        answers: [
+          { answer: '25 минут работы и 5 минут отдыха', isCorrect: true },
+          { answer: 'Работать без перерывов 4 часа', isCorrect: false },
+          { answer: 'Делать только срочные задачи', isCorrect: false },
+        ],
+      },
+      {
+        question: 'Что такое тайм-блокинг?',
+        answers: [
+          {
+            answer: 'Резервирование времени в календаре под конкретные задачи',
+            isCorrect: true,
+          },
+          { answer: 'Блокировка уведомлений навсегда', isCorrect: false },
+          { answer: 'Отказ от планирования', isCorrect: false },
+        ],
+      },
+    ],
+  });
 
   // ── Onboarding Template 1: division-only для ИТ-отдела ────────────────────
   const itDivisionId = divisionIds['ИТ-отдел'];

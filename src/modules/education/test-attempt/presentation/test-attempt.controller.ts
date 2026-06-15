@@ -23,11 +23,13 @@ import { AnswerQuestionCommand } from '@/modules/education/test-attempt/applicat
 import { FinishTestAttemptCommand } from '@/modules/education/test-attempt/application/commands/finish-test-attempt/finish-test-attempt.command';
 import { FindTestAttemptQuery } from '@/modules/education/test-attempt/application/queries/find-test-attempt/find-test-attempt.query';
 import { FindTestAttemptsQuery } from '@/modules/education/test-attempt/application/queries/find-test-attempts/find-test-attempts.query';
+import { GetTestQuestionsQuery } from '@/modules/education/test-attempt/application/queries/get-test-questions/get-test-questions.query';
 import { AnswerQuestionRequestDto } from './dto/answer-question.request.dto';
 import {
   TestAttemptResponseDto,
   TestAttemptResultDto,
   TestAttemptSummaryDto,
+  TestForAttemptDto,
 } from './dto/test-attempt.response.dto';
 
 @ApiTags('test-attempts')
@@ -55,6 +57,17 @@ export class TestAttemptController {
     @Param('testId') testId: string,
   ): Promise<TestAttemptSummaryDto[]> {
     return this.queryBus.execute(new FindTestAttemptsQuery({ testId }));
+  }
+
+  @Get('tests/:testId/questions')
+  @ApiOperation({
+    summary:
+      'Get a test’s questions for taking it (options WITHOUT the isCorrect flag)',
+  })
+  @ApiOkResponse({ type: TestForAttemptDto })
+  @ApiNotFoundResponse()
+  getQuestions(@Param('testId') testId: string): Promise<TestForAttemptDto> {
+    return this.queryBus.execute(new GetTestQuestionsQuery({ testId }));
   }
 
   @Get('attempts/:id')

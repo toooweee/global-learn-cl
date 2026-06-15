@@ -14,7 +14,29 @@ import { CacheService } from './cache.service';
       inject: [EnvService],
       useFactory: (env: EnvService) => ({
         stores: [
-          createKeyv(`redis://${env.get('REDIS_IP')}:${env.get('REDIS_PORT')}`),
+          createKeyv(
+            {
+              url: `redis://${env.get('REDIS_IP')}:${env.get('REDIS_PORT')}`,
+              // Reject commands immediately when the socket is down instead of
+              // queueing them forever — a queued command stalls every cached
+              // read until it (eventually) connects.
+              disableOfflineQueue: true,
+              socket: {
+                connectTimeout: 1_000,
+                // Keep reconnecting with bounded backoff, but a pending
+                // reconnect never blocks a command (offline queue is off).
+                reconnectStrategy: (retries: number) =>
+                  Math.min(200 * (retries + 1), 5_000),
+              },
+            },
+            {
+              // Don't crash app boot if Redis is unreachable at startup.
+              throwOnConnectError: false,
+              // Degrade to no-op on failures; CacheService also guards reads.
+              throwOnErrors: false,
+              connectionTimeout: 1_000,
+            },
+          ),
         ],
       }),
     }),

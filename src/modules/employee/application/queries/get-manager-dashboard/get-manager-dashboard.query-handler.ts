@@ -8,6 +8,7 @@ import {
   SubordinateOnboardingDto,
 } from '@/modules/employee/presentation/dto/manager-dashboard.response.dto';
 import { GetManagerDashboardQuery } from './get-manager-dashboard.query';
+import { subordinateOrgScope } from '@/modules/employee/application/subordinate-org-scope';
 
 @QueryHandler(GetManagerDashboardQuery)
 export class GetManagerDashboardQueryHandler implements IQueryHandler<
@@ -21,12 +22,23 @@ export class GetManagerDashboardQueryHandler implements IQueryHandler<
   ): Promise<ManagerDashboardResponseDto> {
     const manager = await this.prismaService.client.employee.findUnique({
       where: { id: query.managerEmployeeId },
-      select: { positionId: true },
+      select: {
+        positionId: true,
+        divisionId: true,
+        division: { select: { departmentId: true } },
+        user: { select: { role: { select: { name: true } } } },
+      },
     });
 
     if (!manager?.positionId) {
       return this.emptyDashboard();
     }
+
+    const orgScope = subordinateOrgScope(
+      manager.user.role.name,
+      manager.divisionId,
+      manager.division.departmentId,
+    );
 
     const subordinatePositionIds = await this.getAllSubordinatePositionIds(
       manager.positionId,
@@ -40,6 +52,7 @@ export class GetManagerDashboardQueryHandler implements IQueryHandler<
       where: {
         positionId: { in: subordinatePositionIds },
         dismissalDate: null,
+        ...orgScope,
       },
       select: {
         id: true,

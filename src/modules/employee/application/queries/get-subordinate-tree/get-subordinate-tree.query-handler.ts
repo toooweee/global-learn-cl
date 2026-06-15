@@ -5,6 +5,7 @@ import {
   SubordinateTreeNodeDto,
   SubordinateTreeEmployeeDto,
 } from '@/modules/employee/presentation/dto/subordinate-tree.response.dto';
+import { subordinateOrgScope } from '@/modules/employee/application/subordinate-org-scope';
 
 @QueryHandler(GetSubordinateTreeQuery)
 export class GetSubordinateTreeQueryHandler implements IQueryHandler<
@@ -18,9 +19,20 @@ export class GetSubordinateTreeQueryHandler implements IQueryHandler<
   ): Promise<SubordinateTreeNodeDto[]> {
     const manager = await this.prismaService.client.employee.findUnique({
       where: { id: query.managerUserId },
-      select: { positionId: true },
+      select: {
+        positionId: true,
+        divisionId: true,
+        division: { select: { departmentId: true } },
+        user: { select: { role: { select: { name: true } } } },
+      },
     });
     if (!manager?.positionId) return [];
+
+    const orgScope = subordinateOrgScope(
+      manager.user.role.name,
+      manager.divisionId,
+      manager.division.departmentId,
+    );
 
     const allPositions = await this.prismaService.client.position.findMany({
       select: { id: true, name: true, parentId: true },
@@ -49,6 +61,7 @@ export class GetSubordinateTreeQueryHandler implements IQueryHandler<
       where: {
         positionId: { in: subordinatePositionIds },
         dismissalDate: null,
+        ...orgScope,
       },
       select: {
         id: true,
@@ -56,7 +69,7 @@ export class GetSubordinateTreeQueryHandler implements IQueryHandler<
         avatarId: true,
         positionId: true,
         divisionId: true,
-        division: { select: { name: true } },
+        division: { select: { name: true, departmentId: true } },
         user: { select: { email: true } },
       },
     });
@@ -83,6 +96,7 @@ export class GetSubordinateTreeQueryHandler implements IQueryHandler<
               avatarId: e.avatarId,
               divisionId: e.divisionId,
               divisionName: e.division.name,
+              departmentId: e.division.departmentId,
             }),
         ),
         children: (childrenOf.get(positionId) ?? [])

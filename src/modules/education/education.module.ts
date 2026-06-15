@@ -60,6 +60,7 @@ import { AnswerQuestionCommandHandler } from '@/modules/education/test-attempt/a
 import { FinishTestAttemptCommandHandler } from '@/modules/education/test-attempt/application/commands/finish-test-attempt/finish-test-attempt.command-handler';
 import { FindTestAttemptQueryHandler } from '@/modules/education/test-attempt/application/queries/find-test-attempt/find-test-attempt.query-handler';
 import { FindTestAttemptsQueryHandler } from '@/modules/education/test-attempt/application/queries/find-test-attempts/find-test-attempts.query-handler';
+import { GetTestQuestionsQueryHandler } from '@/modules/education/test-attempt/application/queries/get-test-questions/get-test-questions.query-handler';
 import { TestAttemptController } from '@/modules/education/test-attempt/presentation/test-attempt.controller';
 
 // Lesson
@@ -178,6 +179,7 @@ import { FileModule } from '@/infra/file/file.module';
     FinishTestAttemptCommandHandler,
     FindTestAttemptQueryHandler,
     FindTestAttemptsQueryHandler,
+    GetTestQuestionsQueryHandler,
 
     // Lesson
     LessonMapper,
