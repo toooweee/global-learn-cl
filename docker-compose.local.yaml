@@ -3,6 +3,12 @@ services:
     ports:
       - "5434:5432"
 
+  # Publish Redis to the host so the API running locally (pnpm start:dev)
+  # can reach it at localhost:6379 — matches REDIS_IP/REDIS_PORT in .env.
+  redis:
+    ports:
+      - "6379:6379"
+
   redis-insight:
     image: redis/redisinsight:latest
     restart: unless-stopped
