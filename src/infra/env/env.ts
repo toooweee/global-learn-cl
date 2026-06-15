@@ -29,7 +29,11 @@ export const EnvSchema = z.object({
   TEST_EMPLOYEE_EMAIL: z.string(),
   TEST_EMPLOYEE_PASSWORD: z.string(),
 
+  // Internal endpoint the API uses to talk to MinIO (e.g. http://minio:9000).
   MINIO_ENDPOINT: z.string(),
+  // Public, browser-reachable base URL used to build & sign download links
+  // (e.g. https://your-domain). Falls back to MINIO_ENDPOINT when unset (local).
+  MINIO_PUBLIC_URL: z.string().optional(),
   MINIO_ROOT_USER: z.string().min(1),
   MINIO_ROOT_PASSWORD: z.string().min(1),
   MINIO_BUCKET_NAME: z.string().min(1),

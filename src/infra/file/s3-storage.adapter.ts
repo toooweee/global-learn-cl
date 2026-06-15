@@ -15,7 +15,14 @@ import { FileStoragePort } from '@/libs/application/ports/file-storage.port';
 @Injectable()
 export class S3StorageAdapter implements FileStoragePort, OnModuleInit {
   private readonly bucketName: string;
-  private readonly endpoint: string;
+  // Browser-reachable base URL: links are built and signed against this host so
+  // a presigned URL opens in the browser (SigV4 signs the host, which must
+  // match what MinIO sees through the reverse proxy).
+  private readonly publicEndpoint: string;
+  // Separate client whose endpoint is the public URL — used ONLY to sign
+  // download links. Object operations still go through the injected (internal)
+  // client, so the API never has to hairpin out through the public host.
+  private readonly presignClient: S3Client;
   private readonly logger = new Logger(S3StorageAdapter.name);
 
   constructor(
@@ -23,7 +30,18 @@ export class S3StorageAdapter implements FileStoragePort, OnModuleInit {
     private readonly envService: EnvService,
   ) {
     this.bucketName = this.envService.get('MINIO_BUCKET_NAME');
-    this.endpoint = this.envService.get('MINIO_ENDPOINT');
+    this.publicEndpoint =
+      this.envService.get('MINIO_PUBLIC_URL') ??
+      this.envService.get('MINIO_ENDPOINT');
+    this.presignClient = new S3Client({
+      region: this.envService.get('MINIO_REGION'),
+      endpoint: this.publicEndpoint,
+      credentials: {
+        accessKeyId: this.envService.get('MINIO_ROOT_USER'),
+        secretAccessKey: this.envService.get('MINIO_ROOT_PASSWORD'),
+      },
+      forcePathStyle: true,
+    });
   }
 
   async onModuleInit() {
@@ -96,18 +114,21 @@ export class S3StorageAdapter implements FileStoragePort, OnModuleInit {
   async getSignedUrl(publicUrl: string): Promise<string> {
     const fileKey = this.extractKey(publicUrl);
     return getSignedUrl(
-      this.s3Client,
+      this.presignClient,
       new GetObjectCommand({ Bucket: this.bucketName, Key: fileKey }),
       { expiresIn: 3600 },
     );
   }
 
   private buildPublicUrl(key: string): string {
-    return `${this.endpoint}/${this.bucketName}/${key}`;
+    return `${this.publicEndpoint}/${this.bucketName}/${key}`;
   }
 
   private extractKey(publicUrl: string): string {
-    const prefix = `${this.endpoint}/${this.bucketName}/`;
-    return publicUrl.replace(prefix, '');
+    // Host-agnostic: take everything after `/<bucket>/`, so links stored with
+    // an older endpoint (e.g. internal http://minio:9000) still resolve.
+    const marker = `/${this.bucketName}/`;
+    const idx = publicUrl.indexOf(marker);
+    return idx >= 0 ? publicUrl.slice(idx + marker.length) : publicUrl;
   }
 }
