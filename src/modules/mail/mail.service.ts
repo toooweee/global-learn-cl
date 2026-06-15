@@ -9,9 +9,17 @@ export class MailService implements OnModuleInit {
   constructor(private readonly envService: EnvService) {}
 
   onModuleInit(): void {
+    const port = this.envService.get('SMTP_PORT');
+    const user = this.envService.get('SMTP_USER');
+    const pass = this.envService.get('SMTP_PASSWORD');
+
     this.transporter = nodemailer.createTransport({
       host: this.envService.get('SMTP_HOST'),
-      port: this.envService.get('SMTP_PORT'),
+      port,
+      // Port 465 = implicit TLS; 587/others negotiate STARTTLS.
+      secure: port === 465,
+      // No auth for local MailHog; real SMTP requires credentials.
+      auth: user && pass ? { user, pass } : undefined,
     });
   }
 

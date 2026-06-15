@@ -15,6 +15,9 @@ export const EnvSchema = z.object({
 
   SMTP_HOST: z.string().default('localhost'),
   SMTP_PORT: z.coerce.number().default(1025),
+  // Optional — local MailHog needs no auth; real SMTP (Yandex, etc.) does.
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().default('no-reply@globallearn.com'),
 
   APP_URL: z.string().default('http://localhost:3001'),

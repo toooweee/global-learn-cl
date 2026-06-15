@@ -1,6 +1,15 @@
 services:
   api:
     build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
